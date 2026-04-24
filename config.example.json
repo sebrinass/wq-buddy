@@ -1,0 +1,30 @@
+{
+  "version": "v1.0.0",
+  "credentials": {
+    "username": "your_username@example.com",
+    "password": "your_password"
+  },
+  "default_settings": {
+    "instrument_type": "EQUITY",
+    "region": "USA",
+    "universe": "TOP3000",
+    "delay": 1,
+    "decay": 0,
+    "neutralization": "INDUSTRY",
+    "truncation": 0.08,
+    "pasteurization": "ON",
+    "unit_handling": "VERIFY",
+    "nan_handling": "ON",
+    "language": "FASTEXPR",
+    "visualization": false
+  },
+  "database": {
+    "type": "sqlite",
+    "path": "alpha_workbench.db"
+  },
+  "batch_settings": {
+    "sleep_between_requests": 10,
+    "max_retries": 3,
+    "timeout_seconds": 300
+  }
+}

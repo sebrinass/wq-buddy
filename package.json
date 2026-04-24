@@ -1,0 +1,53 @@
+{
+  "name": "wq-buddy",
+  "version": "1.0.0",
+  "description": "WQBuddy - WorldQuant BRAIN Alpha挖掘AI协作工具",
+  "type": "module",
+  "main": "dist/tools.js",
+  "bin": {
+    "wq-buddy": "./dist/cli.js",
+    "wq-buddy-submit": "./dist/cli-wrapper.js"
+  },
+  "exports": {
+    ".": "./dist/tools.js",
+    "./cli": "./dist/cli.js",
+    "./wrapper": "./dist/cli-wrapper.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/cli.ts",
+    "start": "node dist/cli.js",
+    "preview": "tsx src/cli-wrapper.ts preview",
+    "submit": "tsx src/cli-wrapper.ts submit",
+    "docs": "tsx src/cli-wrapper.ts docs",
+    "search": "tsx src/search-cli.ts",
+    "db": "tsx src/db-cli.ts",
+    "watch": "tsc --watch",
+    "link": "npm link"
+  },
+  "keywords": [
+    "worldquant",
+    "alpha",
+    "cli",
+    "agent-tool"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "axios": "^1.6.0",
+    "better-sqlite3": "^12.9.0",
+    "chalk": "^4.1.2",
+    "cli-table3": "^0.6.3",
+    "commander": "^11.1.0",
+    "csv-writer": "^1.6.0",
+    "drizzle-orm": "^0.45.2",
+    "inquirer": "^8.2.6"
+  },
+  "devDependencies": {
+    "@types/inquirer": "^8.2.10",
+    "@types/node": "^20.10.0",
+    "tsx": "^4.6.0",
+    "typescript": "^5.3.2"
+  }
+}

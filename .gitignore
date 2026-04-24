@@ -1,0 +1,45 @@
+# 编译输出
+/dist/
+*.tsbuildinfo
+
+# 配置文件（含明文密码）
+config.json
+
+# Token和凭证文件
+.wq_token.json
+.token.json
+.env
+.env.local
+*.token
+*.key
+*.pem
+
+# 数据库文件
+alpha_workbench.db
+alpha_records.json
+alpha_records.json.bak.*
+
+# 日志文件
+*.log
+logs/
+
+# 测试和调试脚本
+test_*.mjs
+test_*.py
+debug_*.mjs
+
+# 导出数据
+*.csv
+alpha_export_*.csv
+
+# 操作系统文件
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Node依赖
+node_modules/
+
+# IDE配置
+.vscode/
+.idea/
