@@ -1,0 +1,99 @@
+{
+  "id": "wq-buddy",
+  "name": "WQBuddy",
+  "description": "WorldQuant BRAIN Alpha挖掘协作工具 - 字段勘探、表达式构建、回测分析、优化迭代和提交管理",
+  "kind": "extension",
+  "version": "1.0.0",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "enabled": {
+        "type": "boolean",
+        "description": "是否启用WQBuddy插件",
+        "default": true
+      },
+      "configPath": {
+        "type": "string",
+        "description": "BRAIN账号配置文件路径",
+        "default": "~/.wq-buddy/config.json"
+      },
+      "dbPath": {
+        "type": "string",
+        "description": "Alpha数据库文件路径",
+        "default": "~/.wq-buddy/alpha_workbench.db"
+      },
+      "defaultNeutralization": {
+        "type": "string",
+        "description": "默认中和方式",
+        "default": "SUBINDUSTRY",
+        "enum": ["NONE", "MARKET", "INDUSTRY", "SUBINDUSTRY"]
+      },
+      "defaultDecay": {
+        "type": "number",
+        "description": "默认衰减天数",
+        "default": 10
+      },
+      "defaultDelay": {
+        "type": "number",
+        "description": "默认延迟天数",
+        "default": 1
+      },
+      "defaultUniverse": {
+        "type": "string",
+        "description": "默认股票池",
+        "default": "TOP3000"
+      },
+      "defaultRegion": {
+        "type": "string",
+        "description": "默认区域",
+        "default": "USA"
+      },
+      "defaultConcurrency": {
+        "type": "number",
+        "description": "默认并发数",
+        "default": 2
+      },
+      "referencesPath": {
+        "type": "string",
+        "description": "策略知识库目录路径",
+        "default": "~/.wq-buddy/references"
+      }
+    }
+  },
+  "uiHints": {
+    "enabled": {
+      "label": "启用WQBuddy"
+    },
+    "configPath": {
+      "label": "配置文件路径",
+      "advanced": true
+    },
+    "dbPath": {
+      "label": "数据库路径",
+      "advanced": true
+    },
+    "defaultNeutralization": {
+      "label": "默认中和方式"
+    },
+    "defaultDecay": {
+      "label": "默认衰减天数"
+    },
+    "defaultDelay": {
+      "label": "默认延迟天数"
+    },
+    "defaultUniverse": {
+      "label": "默认股票池"
+    },
+    "defaultRegion": {
+      "label": "默认区域"
+    },
+    "defaultConcurrency": {
+      "label": "默认并发数"
+    },
+    "referencesPath": {
+      "label": "知识库路径",
+      "advanced": true
+    }
+  }
+}

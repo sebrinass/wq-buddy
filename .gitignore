@@ -40,6 +40,9 @@ desktop.ini
 # Node依赖
 node_modules/
 
+# ClawHub专用（不推GitHub）
+skill/
+
 # IDE配置
 .vscode/
 .idea/
