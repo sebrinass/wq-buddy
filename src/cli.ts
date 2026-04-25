@@ -88,47 +88,40 @@ class AlphaWorkbench {
     console.log(chalk.yellow('\n=== 全自动批量回测模式 ==='));
     console.log('此模式将批量提交Alpha回测任务\n');
 
-    const { template } = await inquirer.prompt([
+    const { expressionsInput } = await inquirer.prompt([
       {
         type: 'input',
-        name: 'template',
-        message: 'Alpha表达式模板 (使用 {field} 作为占位符)\n示例: ts_decay_linear(rank(ts_delta({field}, 22)), 10)',
-        validate: (input: string) => input.length > 0 || '模板不能为空'
+        name: 'expressionsInput',
+        message: 'Alpha表达式列表 (每行一条，或用逗号分隔)\n示例: rank(cash_flow), ts_delta(earnings,5), abs(revenue)',
+        validate: (input: string) => input.length > 0 || '表达式不能为空'
       }
     ]);
 
-    const { fieldsInput } = await inquirer.prompt([
-      {
-        type: 'input',
-        name: 'fieldsInput',
-        message: '字段列表 (用逗号分隔)\n示例: fnd2_a_albcmperus, fn_liab_fair_val_a, sales'
-      }
-    ]);
+    // 支持逗号分隔或换行分隔
+    const expressions = expressionsInput
+      .split(/[,\n]/)
+      .map((e: string) => e.trim())
+      .filter((e: string) => e.length > 0);
 
-    const fields = fieldsInput.split(',').map((f: string) => f.trim()).filter((f: string) => f.length > 0);
-
-    if (fields.length === 0) {
-      console.log(chalk.yellow('没有字段，返回主菜单'));
+    if (expressions.length === 0) {
+      console.log(chalk.yellow('没有有效的表达式，返回主菜单'));
       return;
     }
 
     console.log(chalk.cyan('\n' + '='.repeat(60)));
-    console.log(chalk.cyan('📋 回测预览'));
+    console.log(chalk.cyan('回测预览'));
     console.log(chalk.cyan('='.repeat(60)));
 
-    console.log(chalk.yellow('\n📝 模板表达式:'));
-    console.log(`   ${template}`);
-
-    console.log(chalk.yellow('\n📊 字段列表:'));
-    console.log(`   共 ${fields.length} 个字段`);
-    if (fields.length <= 5) {
-      fields.forEach((f: string, i: number) => console.log(`   ${i + 1}. ${f}`));
+    console.log(chalk.yellow('\n表达式列表:'));
+    console.log(`   共 ${expressions.length} 条表达式`);
+    if (expressions.length <= 5) {
+      expressions.forEach((e: string, i: number) => console.log(`   ${i + 1}. ${e}`));
     } else {
-      fields.slice(0, 3).forEach((f: string, i: number) => console.log(`   ${i + 1}. ${f}`));
-      console.log(`   ... 还有 ${fields.length - 3} 个字段`);
+      expressions.slice(0, 3).forEach((e: string, i: number) => console.log(`   ${i + 1}. ${e}`));
+      console.log(`   ... 还有 ${expressions.length - 3} 条表达式`);
     }
 
-    console.log(chalk.yellow('\n🔧 当前配置设置:'));
+    console.log(chalk.yellow('\n当前配置设置:'));
     console.log(`   instrumentType: ${this.defaultSettings.instrumentType || 'EQUITY'}`);
     console.log(`   region: ${this.defaultSettings.region || 'USA'}`);
     console.log(`   universe: ${this.defaultSettings.universe || 'TOP3000'}`);
@@ -141,23 +134,13 @@ class AlphaWorkbench {
     console.log(`   nanHandling: ${this.defaultSettings.nanHandling || 'ON'}`);
     console.log(`   language: ${this.defaultSettings.language || 'FASTEXPR'}`);
 
-    console.log(chalk.yellow('\n✅ 将生成的Alpha表达式示例:'));
-    const previewCount = Math.min(3, fields.length);
-    for (let i = 0; i < previewCount; i++) {
-      const previewExpr = template.replace(/\{field\}/g, fields[i]);
-      console.log(`   ${i + 1}. ${previewExpr}`);
-    }
-    if (fields.length > 3) {
-      console.log(`   ... 还有 ${fields.length - 3} 个`);
-    }
-
     console.log(chalk.cyan('\n' + '='.repeat(60)));
 
     const { confirm } = await inquirer.prompt([
       {
         type: 'confirm',
         name: 'confirm',
-        message: `确认开始回测 ${fields.length} 个Alpha?`,
+        message: `确认开始回测 ${expressions.length} 条Alpha表达式?`,
         default: false
       }
     ]);
@@ -167,22 +150,22 @@ class AlphaWorkbench {
       return;
     }
 
-    console.log(chalk.green(`\n🚀 开始批量回测，共 ${fields.length} 个任务...\n`));
+    console.log(chalk.green(`\n开始批量回测，共 ${expressions.length} 条表达式...\n`));
 
     const results: SimResult[] = [];
 
-    for (let i = 0; i < fields.length; i++) {
-      const field = fields[i];
-      const alphaExpr = template.replace(/\{field\}/g, field);
+    for (let i = 0; i < expressions.length; i++) {
+      const alphaExpr = expressions[i];
+      const field = alphaExpr.length > 50 ? alphaExpr.substring(0, 50) + '...' : alphaExpr;
 
-      console.log(`[${i + 1}/${fields.length}] 提交: ${alphaExpr}`);
+      console.log(`[${i + 1}/${expressions.length}] 提交: ${alphaExpr}`);
 
       try {
         const result = await this.submitAndWait(alphaExpr, field);
         results.push(result);
 
         if (result.status === 'success') {
-          console.log(chalk.green(`  ✅ Alpha ID: ${result.alpha_id}`));
+          console.log(chalk.green(`  Alpha ID: ${result.alpha_id}`));
 
           this.db.then(db => {
             db.insertAlpha({
@@ -198,15 +181,16 @@ class AlphaWorkbench {
             });
           });
         } else {
-          console.log(chalk.red(`  ❌ 失败: ${result.error || result.status}`));
+          console.log(chalk.red(`  失败: ${result.error || result.status}`));
         }
 
-        if (i < fields.length - 1) {
+        if (i < expressions.length - 1) {
           await this.sleep(2000);
         }
 
       } catch (e: any) {
-        console.log(chalk.red(`  ❌ 异常: ${e.message}`));
+        // 失败跳过继续，不中断整体
+        console.log(chalk.red(`  异常，跳过: ${e.message}`));
         results.push({
           field,
           alpha_id: null,
@@ -224,7 +208,7 @@ class AlphaWorkbench {
     const successCount = results.filter(r => r.status === 'success').length;
     const failedCount = results.filter(r => r.status !== 'success').length;
 
-    console.log(`\n总计: ${results.length} 个`);
+    console.log(`\n总计: ${results.length} 条`);
     console.log(chalk.green(`  成功: ${successCount}`));
     console.log(chalk.red(`  失败: ${failedCount}`));
 
@@ -240,9 +224,9 @@ class AlphaWorkbench {
     if (viewResults) {
       console.log('\n详细结果:');
       for (const r of results) {
-        const icon = r.status === 'success' ? '✅' : '❌';
+        const icon = r.status === 'success' ? 'OK' : 'FAIL';
         const alphaId = r.alpha_id || '-';
-        console.log(`  ${icon} ${r.field}: ${alphaId}`);
+        console.log(`  [${icon}] ${r.field}: ${alphaId}`);
       }
     }
   }

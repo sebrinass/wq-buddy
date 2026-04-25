@@ -49,12 +49,13 @@ export interface AlphaResult extends AlphaMetrics {
 }
 
 export interface BatchSubmitParams {
-  template: string;
-  fields: string[];
+  /** Alpha表达式列表（必填），每条为完整的alpha表达式 */
+  expressions: string[];
   username?: string;
   password?: string;
   autoConfirm?: boolean;
   enableCheckDuplicate?: boolean;
+  /** 并发数 1-3，默认1 */
   concurrency?: number;
 }
 
@@ -94,9 +95,10 @@ function calculateSubmitStatus(checks?: ISCheck[]): string {
   return '未提交';
 }
 
-function saveResult(result: AlphaResult, settingsHashValue?: string): void {
-  getDatabase().then((db: any) => {
-    db.insertAlpha({
+async function saveResult(result: AlphaResult, settingsHashValue?: string): Promise<void> {
+  try {
+    const db: any = await getDatabase();
+    const id = await db.insertAlpha({
       alpha_id: result.alpha_id,
       expression: result.expression,
       field: result.field,
@@ -127,14 +129,11 @@ function saveResult(result: AlphaResult, settingsHashValue?: string): void {
       rejectReason: result.rejectReason,
       
       canSubmit: calculateSubmitStatus(result.checks) === '可提交(待查)'
-    }).then((id: number) => {
-      info(`结果已保存到SQLite: ID=${id} | ${result.alpha_id || 'FAILED'} | ${result.field}`);
-    }).catch((e: any) => {
-      logError('数据库保存失败', e.message);
     });
-  }).catch((e: any) => {
-    logError('数据库初始化失败', e.message);
-  });
+    info(`结果已保存到SQLite: ID=${id} | ${result.alpha_id || 'FAILED'} | ${result.field}`);
+  } catch (e: any) {
+    logError('数据库保存失败', e.message);
+  }
 }
 
 async function getAlphaInfo(session: AxiosInstance, cookie: string, alphaId: string): Promise<AlphaMetrics & { checks?: ISCheck[]; stage?: string; grade?: string; submitStatus?: string }> {
@@ -223,48 +222,6 @@ async function getSession(username: string, password: string): Promise<{ session
   const result = await Authenticator.loginWithCookie(username, password);
   info('登录成功');
   return result;
-}
-
-export async function alphaPreview(params: BatchSubmitParams): Promise<string> {
-  const { template, fields } = params;
-
-  if (!template || template.trim().length === 0) {
-    return '❌ 模板不能为空';
-  }
-
-  if (!fields || fields.length === 0) {
-    return '❌ 字段列表不能为空';
-  }
-
-  const config = loadConfig();
-  const settings = getDefaultSettings(config!);
-  const previewCount = Math.min(3, fields.length);
-
-  let output = '📋 **Alpha 回测预览**\n\n';
-  output += `**模板**: \`${template}\`\n\n`;
-  output += `**字段数量**: ${fields.length} 个\n\n`;
-  output += '**将生成的 Alpha 表达式示例**:\n';
-
-  for (let i = 0; i < previewCount; i++) {
-    const expr = template.replace(/\{field\}/g, fields[i]);
-    output += `${i + 1}. \`${expr}\`\n`;
-  }
-
-  if (fields.length > 3) {
-    output += `... 还有 ${fields.length - 3} 个\n`;
-  }
-
-  output += '\n**当前配置设置**:\n';
-  output += `- instrumentType: ${settings.instrumentType}\n`;
-  output += `- region: ${settings.region}\n`;
-  output += `- universe: ${settings.universe}\n`;
-  output += `- delay: ${settings.delay}\n`;
-  output += `- decay: ${settings.decay}\n`;
-  output += `- neutralization: ${settings.neutralization}\n`;
-  output += `- truncation: ${settings.truncation}\n`;
-  output += `- language: ${settings.language}\n`;
-
-  return output;
 }
 
 export async function checkDuplicate(expression: string, hash?: string): Promise<{ isDuplicate: boolean; existingRecord?: DbAlphaRecord }> {
@@ -358,7 +315,7 @@ async function submitSingleAlpha(
         error: `HTTP ${response.status}`,
         submittedAt
       };
-      saveResult(result, settingsHashValue);
+      await saveResult(result, settingsHashValue);
       return result;
     }
 
@@ -372,10 +329,9 @@ async function submitSingleAlpha(
         error: 'No Location header',
         submittedAt
       };
-      saveResult(result, settingsHashValue);
+      await saveResult(result, settingsHashValue);
       return result;
     }
-
     debug('回测进度URL', location);
 
     while (true) {
@@ -422,7 +378,7 @@ async function submitSingleAlpha(
 
       info(`${result.status === 'COMPLETE' ? '✅' : '❌'} Alpha ID: ${result.alpha || 'N/A'} | ${field}`);
 
-      saveResult(alphaResult, settingsHashValue);
+      await saveResult(alphaResult, settingsHashValue);
       return alphaResult;
     }
   } catch (e: any) {
@@ -435,7 +391,7 @@ async function submitSingleAlpha(
       error: e.message,
       submittedAt
     };
-    saveResult(result, settingsHashValue);
+    await saveResult(result, settingsHashValue);
     return result;
   }
 }
@@ -451,14 +407,17 @@ export async function alphaBatchSubmit(params: BatchSubmitParams): Promise<{
   };
   duplicates: { field: string; expression: string; existingId: string }[];
 }> {
-  const { template, fields, username, password, enableCheckDuplicate = false, concurrency = 1 } = params;
+  const { expressions, username, password, enableCheckDuplicate = false, concurrency = 1 } = params;
 
-  if (!template || template.trim().length === 0) {
-    throw new Error('模板不能为空');
+  // 校验表达式列表
+  if (!expressions || expressions.length === 0) {
+    throw new Error('表达式列表不能为空');
   }
 
-  if (!fields || fields.length === 0) {
-    throw new Error('字段列表不能为空');
+  // 过滤空表达式
+  const validExpressions = expressions.filter(e => e.trim().length > 0);
+  if (validExpressions.length === 0) {
+    throw new Error('没有有效的表达式');
   }
 
   const validConcurrency = Math.min(3, Math.max(1, concurrency));
@@ -479,7 +438,7 @@ export async function alphaBatchSubmit(params: BatchSubmitParams): Promise<{
     throw new Error('请在 config.json 中配置账号密码，或提供 username/password 参数');
   }
 
-  info('开始批量回测', { user, count: fields.length, concurrency: validConcurrency });
+  info('开始批量回测', { user, count: validExpressions.length, concurrency: validConcurrency });
   const { session, cookie } = await getSession(user, pass);
 
   const settings = getDefaultSettings(config);
@@ -488,42 +447,71 @@ export async function alphaBatchSubmit(params: BatchSubmitParams): Promise<{
   const duplicates: { field: string; expression: string; existingId: string }[] = [];
 
   if (validConcurrency === 1) {
-    for (let i = 0; i < fields.length; i++) {
-      const field = fields[i];
-      const alphaExpr = template.replace(/\{field\}/g, field);
+    // 串行模式：逐条提交，失败跳过继续
+    for (let i = 0; i < validExpressions.length; i++) {
+      const alphaExpr = validExpressions[i];
+      // field 用表达式自身（截取前50字符作为标识）
+      const field = alphaExpr.length > 50 ? alphaExpr.substring(0, 50) + '...' : alphaExpr;
 
-      const result = await submitSingleAlpha(session, cookie, alphaExpr, field, settings, settingsHashValue, enableCheckDuplicate);
-      results.push(result);
+      try {
+        const result = await submitSingleAlpha(session, cookie, alphaExpr, field, settings, settingsHashValue, enableCheckDuplicate);
+        results.push(result);
 
-      if (enableCheckDuplicate && result.status === 'success' && result.alpha_id) {
-        const db = await getDatabase();
-        const existingRecords = await db.searchAlphas({ alpha_id: result.alpha_id });
-        if (existingRecords.length > 1) {
-          duplicates.push({ field, expression: alphaExpr, existingId: result.alpha_id });
+        if (enableCheckDuplicate && result.status === 'success' && result.alpha_id) {
+          const db = await getDatabase();
+          const existingRecords = await db.searchAlphas({ alpha_id: result.alpha_id });
+          if (existingRecords.length > 1) {
+            duplicates.push({ field, expression: alphaExpr, existingId: result.alpha_id });
+          }
         }
+      } catch (e: any) {
+        // 失败跳过继续，不中断整体
+        warn(`表达式回测异常，跳过: ${field}`, e.message);
+        results.push({
+          alpha_id: null,
+          expression: alphaExpr,
+          field,
+          status: 'error',
+          error: e.message,
+          submittedAt: new Date().toISOString()
+        });
       }
 
-      if (i < fields.length - 1) {
+      if (i < validExpressions.length - 1) {
         await sleep(3000);
       }
     }
   } else {
-    for (let i = 0; i < fields.length; i += validConcurrency) {
-      const batch = fields.slice(i, i + validConcurrency);
+    // 并发模式：分批提交
+    for (let i = 0; i < validExpressions.length; i += validConcurrency) {
+      const batch = validExpressions.slice(i, i + validConcurrency);
       const batchNum = Math.floor(i / validConcurrency) + 1;
-      const totalBatches = Math.ceil(fields.length / validConcurrency);
+      const totalBatches = Math.ceil(validExpressions.length / validConcurrency);
       
       info(`提交批次 ${batchNum}/${totalBatches}，共 ${batch.length} 个任务`);
 
-      const promises = batch.map(async (field) => {
-        const alphaExpr = template.replace(/\{field\}/g, field);
-        return await submitSingleAlpha(session, cookie, alphaExpr, field, settings, settingsHashValue, enableCheckDuplicate);
+      const promises = batch.map(async (alphaExpr) => {
+        const field = alphaExpr.length > 50 ? alphaExpr.substring(0, 50) + '...' : alphaExpr;
+        try {
+          return await submitSingleAlpha(session, cookie, alphaExpr, field, settings, settingsHashValue, enableCheckDuplicate);
+        } catch (e: any) {
+          // 失败跳过继续
+          warn(`表达式回测异常，跳过: ${field}`, e.message);
+          return {
+            alpha_id: null,
+            expression: alphaExpr,
+            field,
+            status: 'error' as const,
+            error: e.message,
+            submittedAt: new Date().toISOString()
+          } as AlphaResult;
+        }
       });
 
       const batchResults = await Promise.all(promises);
       results.push(...batchResults);
 
-      if (i + validConcurrency < fields.length) {
+      if (i + validConcurrency < validExpressions.length) {
         await sleep(5000);
       }
     }
@@ -532,7 +520,7 @@ export async function alphaBatchSubmit(params: BatchSubmitParams): Promise<{
   const successCount = results.filter(r => r.status === 'success').length;
   const failedCount = results.filter(r => r.status !== 'success').length;
 
-  info('批量回测完成', { total: fields.length, successCount, failedCount, duplicateCount: duplicates.length });
+  info('批量回测完成', { total: validExpressions.length, successCount, failedCount, duplicateCount: duplicates.length });
 
   await closeDatabase();
 
@@ -541,7 +529,7 @@ export async function alphaBatchSubmit(params: BatchSubmitParams): Promise<{
     results,
     duplicates,
     summary: {
-      total: fields.length,
+      total: validExpressions.length,
       successCount,
       failedCount,
       duplicateCount: duplicates.length
@@ -751,7 +739,6 @@ export async function alphaStats(options?: AlphaStatsOptions): Promise<string> {
 }
 
 export default {
-  alphaPreview,
   alphaBatchSubmit,
   formatResults,
   alphaStats

@@ -3,12 +3,11 @@
  * 用于分析数据字段特性，复用回测接口但不自动保存到alpha数据库
  */
 
-import axios, { AxiosInstance } from 'axios';
-import * as fs from 'fs';
+import { AxiosInstance } from 'axios';
 import { loadConfig, getDefaultSettings } from './config.js';
 import { info, warn, error as logError, debug } from './logger.js';
 import { getDatabase } from './db/index.js';
-import { TOKEN_PATH } from './paths.js';
+import { Authenticator } from './auth.js';
 
 export interface FieldAnalysisResult {
   field_name: string;
@@ -36,36 +35,16 @@ const ANALYSIS_TESTS = [
 ];
 
 async function getSession(username: string, password: string): Promise<{ session: AxiosInstance; cookie: string }> {
-  try {
-    if (fs.existsSync(TOKEN_PATH)) {
-      const cache = JSON.parse(fs.readFileSync(TOKEN_PATH, 'utf-8'));
-      if (cache.expiryTime > Date.now()) {
-        const session = axios.create({
-          baseURL: 'https://api.worldquantbrain.com',
-          timeout: 60000
-        });
-        await session.get('/users/me', { headers: { 'Cookie': cache.cookie } });
-        return { session, cookie: cache.cookie };
-      }
-    }
-  } catch (e) {
-    // token无效，重新登录
+  const cached = await Authenticator.getSessionWithCookie(username);
+  if (cached) {
+    info('字段分析工具使用缓存的Token登录');
+    return cached;
   }
 
-  const session = axios.create({
-    baseURL: 'https://api.worldquantbrain.com',
-    timeout: 60000
-  });
-
-  const response = await session.post('/authentication', {}, {
-    auth: { username, password }
-  });
-
-  const setCookie = response.headers['set-cookie'];
-  const cookies = Array.isArray(setCookie) ? setCookie : [setCookie];
-  const cookie = cookies.map((c: any) => String(c).split(';')[0]).join('; ');
-
-  return { session, cookie };
+  info('字段分析工具正在登录...');
+  const result = await Authenticator.loginWithCookie(username, password);
+  info('字段分析工具登录成功');
+  return result;
 }
 
 async function submitAnalysisTest(session: AxiosInstance, cookie: string, expression: string, settings: any): Promise<any> {

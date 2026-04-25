@@ -565,6 +565,11 @@ export class SQLiteAdapter implements DatabaseInterface {
     }));
 
     await csvWriter.writeRecords(records);
+
+    const fs = await import('fs');
+    const content = fs.readFileSync(csvPath, 'utf-8');
+    fs.writeFileSync(csvPath, '\ufeff' + content, 'utf-8');
+
     info(`Alpha数据已导出到: ${csvPath}`);
   }
 

@@ -1,12 +1,12 @@
 {
   "name": "wq-buddy",
-  "version": "1.0.1",
+  "version": "1.5.0",
   "description": "WQBuddy - WorldQuant BRAIN Alpha挖掘AI协作工具",
   "type": "module",
   "main": "dist/tools.js",
   "bin": {
-    "wq-buddy": "./dist/cli.js",
-    "wq-buddy-submit": "./dist/cli-wrapper.js"
+    "wq": "./dist/cli-wrapper.js",
+    "wq-buddy": "./dist/cli.js"
   },
   "exports": {
     ".": "./dist/tools.js",
@@ -15,12 +15,11 @@
   },
   "scripts": {
     "build": "tsc",
-    "dev": "tsx src/cli.ts",
-    "start": "node dist/cli.js",
-    "preview": "tsx src/cli-wrapper.ts preview",
-    "submit": "tsx src/cli-wrapper.ts submit",
+    "dev": "tsx src/cli-wrapper.ts",
+    "start": "node dist/cli-wrapper.js",
+    "wq": "tsx src/cli-wrapper.ts",
     "docs": "tsx src/cli-wrapper.ts docs",
-    "search": "tsx src/search-cli.ts",
+    "search": "tsx src/cli-wrapper.ts search",
     "db": "tsx src/db-cli.ts",
     "watch": "tsc --watch",
     "link": "npm link"

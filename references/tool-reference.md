@@ -135,6 +135,19 @@
 
 **用途**：通过关键词搜索BRAIN平台的数据字段。
 
+**⚠️ 调用规范（重要！）**
+
+```
+❌ 错误：AI自己写HTTP请求、手动处理Cookie、用Bearer Token认证
+✅ 正确：直接调用 searchFields() 函数，内部已处理所有认证逻辑
+
+原因：
+- 平台搜索API必须用Cookie认证（Bearer Token会返回401）
+- URL必须带完整参数（instrumentType/region/delay/universe）
+- 缺少参数会返回400错误
+- searchFields() 内部已处理：登录 → Cookie缓存 → 参数拼接 → 请求发送
+```
+
 **参数**：
 
 | 参数 | 类型 | 必选 | 说明 |
@@ -150,6 +163,11 @@
 - `searchFields("ebit")` — 搜索含ebit的字段
 - `searchFields("earnings", {datasetId: "fundamental6"})` — 在基本面数据集中搜索
 - `searchFields("", {datasetId: "scl12", limit: 200})` — 获取scl12全部字段
+
+**认证机制**：
+- 自动读取 config.json 的账号密码
+- Cookie缓存4小时，过期自动重新登录
+- AI不需要手动处理任何认证逻辑
 
 ### getFieldsByDataset() 详解
 
