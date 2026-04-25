@@ -9,17 +9,20 @@ metadata:
       config:
         - path: "~/.wq-buddy/config.json"
           access: "read"
-          purpose: "读取BRAIN账号配置"
-      filesystem:
-        - path: "~/.wq-buddy/alpha_workbench.db"
+          purpose: "读取BRAIN账号配置（含明文凭证）"
+        - path: "~/.openclaw/openclaw.json"
           access: "read-write"
-          purpose: "存储Alpha回测结果和字段分析数据"
-        - path: "~/.wq-buddy/references"
-          access: "read-write"
-          purpose: "读取和更新策略知识库文档"
-        - path: "~/.wq-buddy/.wq_token.json"
-          access: "read-write"
-          purpose: "缓存BRAIN平台登录会话Token"
+          purpose: "添加插件路径并重启Gateway"
+    filesystem:
+      - path: "~/.wq-buddy/alpha_workbench.db"
+        access: "read-write"
+        purpose: "存储Alpha回测结果和字段分析数据"
+      - path: "~/.wq-buddy/references"
+        access: "read-write"
+        purpose: "读取和更新策略知识库文档"
+      - path: "~/.wq-buddy/.wq_token.json"
+        access: "read-write"
+        purpose: "缓存BRAIN平台登录会话Token"
     install:
       - id: npm
         kind: node
