@@ -3,7 +3,7 @@
   "name": "WQBuddy",
   "description": "WorldQuant BRAIN Alpha挖掘协作工具 - 字段勘探、表达式构建、回测分析、优化迭代和提交管理",
   "kind": "extension",
-  "version": "1.0.1",
+  "version": "1.0.3",
   "contracts": {
     "tools": [
       "alphaBatchSubmit",
@@ -36,13 +36,13 @@
       "defaultNeutralization": {
         "type": "string",
         "description": "默认中和方式",
-        "default": "SUBINDUSTRY",
+        "default": "INDUSTRY",
         "enum": ["NONE", "MARKET", "INDUSTRY", "SUBINDUSTRY"]
       },
       "defaultDecay": {
         "type": "number",
         "description": "默认衰减天数",
-        "default": 10
+        "default": 0
       },
       "defaultDelay": {
         "type": "number",
@@ -62,7 +62,7 @@
       "defaultConcurrency": {
         "type": "number",
         "description": "默认并发数",
-        "default": 2
+        "default": 1
       },
       "referencesPath": {
         "type": "string",

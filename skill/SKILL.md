@@ -5,11 +5,11 @@ metadata:
   openclaw:
     emoji: "📊"
     requires:
-      bins: ["wq-buddy"]
+      bins: ["wq", "wq-buddy"]
       config:
         - path: "~/.wq-buddy/config.json"
-          access: "read"
-          purpose: "读取BRAIN账号配置（含明文凭证）"
+          access: "read-write"
+          purpose: "读取BRAIN账号配置（含明文凭证）；回测时临时写入参数覆盖后恢复"
         - path: "~/.openclaw/openclaw.json"
           access: "read-write"
           purpose: "添加插件路径并重启Gateway"
@@ -50,7 +50,7 @@ npm install -g wq-buddy
 
 ```json
 {
-  "version": "v1.0.1",
+  "version": "v1.0.3",
   "credentials": {
     "username": "你的BRAIN账号",
     "password": "你的BRAIN密码"
@@ -161,7 +161,7 @@ wq analyze fnd2_ebitdm
 
 **回测后闭环**: 完成后检查空字段，有可提交Alpha时强制提醒用户查平台
 
-详见 [submission-workflow.md](references/submission-workflow.md)
+详见 [submission-workflow.md](../references/submission-workflow.md)
 
 ---
 
@@ -192,7 +192,7 @@ wq analyze fnd2_ebitdm
 
 分析配置: 自动使用 Neutralization=None, Decay=0
 
-详见 [field-analysis.md](references/field-analysis.md)
+详见 [field-analysis.md](../references/field-analysis.md)
 
 ---
 
@@ -262,10 +262,10 @@ wq analyze fnd2_ebitdm
 正确: vec_avg(returns) + ts_mean(volume, 10)
 错误: returns + ts_mean(volume, 10)   ← returns是向量，直接运算报错
 
-可用压缩算子: vec_avg / vec_sum / vec_max / ts_前缀算子
+可用压缩算子: vec_avg / vec_sum
 ```
 
-详见 [data-type-strategy.md](references/data-type-strategy.md)
+详见 [data-type-strategy.md](../references/data-type-strategy.md)
 
 ---
 
@@ -284,7 +284,7 @@ wq analyze fnd2_ebitdm
 | 已通过 | 用户确认OK | 手动 | updateSubmitStatus(id, "已通过") |
 | 提交失败 | 用户告知失败+原因 | 手动 | updateSubmitStatus(id, "提交失败", reason) |
 
-详见 [submission-workflow.md](references/submission-workflow.md)
+详见 [submission-workflow.md](../references/submission-workflow.md)
 
 ---
 
@@ -308,7 +308,7 @@ wq analyze fnd2_ebitdm
 套用模板 → 变异优化（每次只改一个变量）
 ```
 
-详见 [strategy-patterns.md](references/strategy-patterns.md)
+详见 [strategy-patterns.md](../references/strategy-patterns.md)
 
 ---
 
@@ -323,7 +323,7 @@ wq analyze fnd2_ebitdm
 | FAIL-HIGH_TURNOVER | 换手率超限 | 增大Decay或用group_neutralize |
 | FAIL-SELF_CORRELATION | 与已有Alpha太相似 | 换数据源或改算子组合 |
 
-详见 [optimization-guide.md](references/optimization-guide.md)
+详见 [optimization-guide.md](../references/optimization-guide.md)
 
 ---
 
@@ -336,10 +336,10 @@ wq analyze fnd2_ebitdm
 
 ## 参考资料
 
-- [字段分析方法论](references/field-analysis.md) — 6种标准测试 + 判断流程
-- [提交流程与状态管理](references/submission-workflow.md) — 状态转换图 + 特殊场景
-- [工具集成指南](references/tool-reference.md) — 函数列表 + 工作流示例
-- [策略模式库](references/strategy-patterns.md) — 已验证/待验证的Alpha构建模式
-- [数据类型策略](references/data-type-strategy.md) — 基本面/量价/情绪数据策略
-- [优化指南](references/optimization-guide.md) — 诊断方法 + 优化路径
-- [运算符速查](references/operators-reference.md) — 6大类运算符语法+用法+示例
+- [字段分析方法论](../references/field-analysis.md) — 6种标准测试 + 判断流程
+- [提交流程与状态管理](../references/submission-workflow.md) — 状态转换图 + 特殊场景
+- [工具集成指南](../references/tool-reference.md) — 函数列表 + 工作流示例
+- [策略模式库](../references/strategy-patterns.md) — 已验证/待验证的Alpha构建模式
+- [数据类型策略](../references/data-type-strategy.md) — 基本面/量价/情绪数据策略
+- [优化指南](../references/optimization-guide.md) — 诊断方法 + 优化路径
+- [运算符速查](../references/operators-reference.md) — 6大类运算符语法+用法+示例

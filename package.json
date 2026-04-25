@@ -1,12 +1,12 @@
 {
   "name": "wq-buddy",
-  "version": "1.0.1",
+  "version": "1.0.3",
   "description": "WQBuddy - WorldQuant BRAIN Alpha挖掘AI协作工具",
   "type": "module",
   "main": "dist/tools.js",
   "bin": {
-    "wq": "./dist/cli-wrapper.js",
-    "wq-buddy": "./dist/cli.js"
+    "wq": "dist/cli-wrapper.js",
+    "wq-buddy": "dist/cli.js"
   },
   "exports": {
     ".": "./dist/tools.js",
