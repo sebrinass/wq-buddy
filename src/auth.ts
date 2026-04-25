@@ -1,8 +1,6 @@
 import axios, { AxiosInstance } from 'axios';
 import * as fs from 'fs';
-import * as path from 'path';
-
-const TOKEN_FILE = path.join(process.cwd(), '.wq_token.json');
+import { TOKEN_PATH, ensureWorkDir } from './paths.js';
 
 interface TokenCache {
   username: string;
@@ -27,8 +25,8 @@ export class Authenticator {
 
   private loadCachedToken(): TokenCache | null {
     try {
-      if (fs.existsSync(TOKEN_FILE)) {
-        const raw = fs.readFileSync(TOKEN_FILE, 'utf-8');
+      if (fs.existsSync(TOKEN_PATH)) {
+        const raw = fs.readFileSync(TOKEN_PATH, 'utf-8');
         const cache: TokenCache = JSON.parse(raw);
         
         const now = Date.now();
@@ -37,7 +35,7 @@ export class Authenticator {
           return cache;
         } else {
           console.log('⚠️ Token已过期，需要重新登录');
-          fs.unlinkSync(TOKEN_FILE);
+          fs.unlinkSync(TOKEN_PATH);
           return null;
         }
       }
@@ -57,7 +55,8 @@ export class Authenticator {
         userId: tokenData.user?.id || ''
       };
       
-      fs.writeFileSync(TOKEN_FILE, JSON.stringify(cache, null, 2));
+      ensureWorkDir();
+      fs.writeFileSync(TOKEN_PATH, JSON.stringify(cache, null, 2));
       console.log('💾 Token已保存到本地缓存');
     } catch (e) {
       console.log('⚠️ Token保存失败（不影响正常使用）');
@@ -170,7 +169,8 @@ export class Authenticator {
         expiryTime: Date.now() + expiry * 1000,
         userId: userData.user?.id || ''
       };
-      fs.writeFileSync(TOKEN_FILE, JSON.stringify(cache, null, 2));
+      ensureWorkDir();
+      fs.writeFileSync(TOKEN_PATH, JSON.stringify(cache, null, 2));
     } catch (e) {
       // ignore
     }
@@ -180,8 +180,8 @@ export class Authenticator {
 
   static async getSessionWithCookie(username: string): Promise<{ session: AxiosInstance; cookie: string } | null> {
     try {
-      if (fs.existsSync(TOKEN_FILE)) {
-        const raw = fs.readFileSync(TOKEN_FILE, 'utf-8');
+      if (fs.existsSync(TOKEN_PATH)) {
+        const raw = fs.readFileSync(TOKEN_PATH, 'utf-8');
         const cache: TokenCache = JSON.parse(raw);
         
         if (cache.expiryTime > Date.now() && cache.username === username && cache.cookie) {

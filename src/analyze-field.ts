@@ -8,6 +8,7 @@ import * as fs from 'fs';
 import { loadConfig, getDefaultSettings } from './config.js';
 import { info, warn, error as logError, debug } from './logger.js';
 import { getDatabase } from './db/index.js';
+import { TOKEN_PATH } from './paths.js';
 
 export interface FieldAnalysisResult {
   field_name: string;
@@ -35,12 +36,9 @@ const ANALYSIS_TESTS = [
 ];
 
 async function getSession(username: string, password: string): Promise<{ session: AxiosInstance; cookie: string }> {
-  // 复用tools.ts的登录逻辑（简化版）
-  const TOKEN_FILE = '.wq_token.json';
-  
   try {
-    if (fs.existsSync(TOKEN_FILE)) {
-      const cache = JSON.parse(fs.readFileSync(TOKEN_FILE, 'utf-8'));
+    if (fs.existsSync(TOKEN_PATH)) {
+      const cache = JSON.parse(fs.readFileSync(TOKEN_PATH, 'utf-8'));
       if (cache.expiryTime > Date.now()) {
         const session = axios.create({
           baseURL: 'https://api.worldquantbrain.com',

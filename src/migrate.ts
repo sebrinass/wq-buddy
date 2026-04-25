@@ -4,11 +4,13 @@
  */
 
 import * as fs from 'fs';
+import * as path from 'path';
 import { getDatabase } from './db/index.js';
 import { info } from './logger.js';
+import { WORK_DIR, ensureWorkDir } from './paths.js';
 
 export async function migrateFromJson(): Promise<void> {
-  const JSON_FILE = 'alpha_records.json';
+  const JSON_FILE = path.join(WORK_DIR, 'alpha_records.json');
   
   if (!fs.existsSync(JSON_FILE)) {
     info('JSON文件不存在，跳过迁移');
@@ -100,7 +102,7 @@ export async function migrateFromJson(): Promise<void> {
   info(`迁移完成: Alpha ${migratedAlphas}/${records.length} | 字段 ${migratedFields}/${dataFields.length} | 批次 ${migratedBatches}/${batches.length}`);
   
   // 备份JSON文件
-  const backupFile = `alpha_records.json.bak.${Date.now()}`;
+  const backupFile = path.join(WORK_DIR, `alpha_records.json.bak.${Date.now()}`);
   fs.copyFileSync(JSON_FILE, backupFile);
   info(`JSON文件已备份到: ${backupFile}`);
 }

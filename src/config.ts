@@ -1,11 +1,10 @@
 import * as fs from 'fs';
-import * as path from 'path';
 import { AppConfig, Credentials, SimulationSettings } from './types.js';
-
-const CONFIG_PATH = path.join(process.cwd(), 'config.json');
+import { CONFIG_PATH, ensureWorkDir } from './paths.js';
 
 export function loadConfig(): AppConfig | null {
   try {
+    ensureWorkDir();
     const raw = fs.readFileSync(CONFIG_PATH, 'utf-8');
     return JSON.parse(raw);
   } catch (e: any) {

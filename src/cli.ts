@@ -8,6 +8,8 @@ import { Authenticator } from './auth.js';
 import { getDatabase } from './db/index.js';
 import type { Database } from './db/Database.js';
 import { SimulationSettings } from './types.js';
+import { WORK_DIR, ensureWorkDir } from './paths.js';
+import * as path from 'path';
 
 interface SimResult {
   field: string;
@@ -375,7 +377,8 @@ class AlphaWorkbench {
         break;
       case 'csv':
         const filename = `alpha_records_${new Date().toISOString().replace(/[:.]/g, '-')}.csv`;
-        await db.exportAlphasToCsv(filename);
+        ensureWorkDir();
+        await db.exportAlphasToCsv(path.join(WORK_DIR, filename));
         console.log(chalk.green(`已导出到: ${filename}`));
         break;
       case 'back':

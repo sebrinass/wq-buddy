@@ -1,8 +1,9 @@
 import axios from 'axios';
 import * as fs from 'fs';
+import { TOKEN_PATH } from './paths.js';
 
 async function checkCorrelationAPI() {
-  const tokenCache = JSON.parse(fs.readFileSync('.wq_token.json', 'utf-8'));
+  const tokenCache = JSON.parse(fs.readFileSync(TOKEN_PATH, 'utf-8'));
   
   const session = axios.create({
     baseURL: 'https://api.worldquantbrain.com',

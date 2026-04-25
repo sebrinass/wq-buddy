@@ -7,6 +7,7 @@ import axios, { AxiosInstance } from 'axios';
 import * as fs from 'fs';
 import { loadConfig } from './config.js';
 import { info } from './logger.js';
+import { TOKEN_PATH, ensureWorkDir } from './paths.js';
 
 export interface DataField {
   id: string;
@@ -30,12 +31,10 @@ interface TokenCache {
   expiryTime: number;
 }
 
-const TOKEN_FILE = '.wq_token.json';
-
 function loadToken(): TokenCache | null {
   try {
-    if (fs.existsSync(TOKEN_FILE)) {
-      const cache = JSON.parse(fs.readFileSync(TOKEN_FILE, 'utf-8'));
+    if (fs.existsSync(TOKEN_PATH)) {
+      const cache = JSON.parse(fs.readFileSync(TOKEN_PATH, 'utf-8'));
       if (cache.expiryTime > Date.now()) {
         return cache;
       }
@@ -48,7 +47,8 @@ function loadToken(): TokenCache | null {
 
 function saveToken(username: string, password: string, cookie: string, expiry: number): void {
   try {
-    fs.writeFileSync(TOKEN_FILE, JSON.stringify({
+    ensureWorkDir();
+    fs.writeFileSync(TOKEN_PATH, JSON.stringify({
       username,
       password,
       cookie,

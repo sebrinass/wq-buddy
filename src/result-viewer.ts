@@ -3,6 +3,7 @@ import * as path from 'path';
 import Table from 'cli-table3';
 import type { Database, AlphaRecord } from './db/Database.js';
 import * as createCsvWriter from 'csv-writer';
+import { WORK_DIR, ensureWorkDir } from './paths.js';
 
 export class ResultViewer {
   private db: Promise<Database>;
@@ -66,7 +67,8 @@ export class ResultViewer {
     }
 
     const database = await this.db;
-    await database.exportAlphasToCsv(path.join(process.cwd(), filename));
+    ensureWorkDir();
+    await database.exportAlphasToCsv(path.join(WORK_DIR, filename));
     console.log(`已导出到: ${filename}`);
   }
 
@@ -77,7 +79,8 @@ export class ResultViewer {
 
     const database = await this.db;
     const records = await database.searchAlphas({});
-    fs.writeFileSync(path.join(process.cwd(), filename), JSON.stringify(records, null, 2), 'utf-8');
+    ensureWorkDir();
+    fs.writeFileSync(path.join(WORK_DIR, filename), JSON.stringify(records, null, 2), 'utf-8');
     console.log(`已导出到: ${filename}`);
   }
 }

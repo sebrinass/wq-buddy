@@ -251,6 +251,32 @@ tags: ["worldquant", "alpha", "backtest", "field-analysis", "submission", "optim
 1. 先查本地 `field_analyses` 表（`db.searchFieldAnalysis()`），看是否已有分析
 2. 再搜平台API（`searchFields()`），获取可用字段列表
 
+**⚠️ 搜索工具调用规范（重要！）**
+
+```
+❌ 错误：AI自己写HTTP请求、手动处理Cookie、用Bearer Token
+✅ 正确：直接调用项目提供的 searchFields() 函数
+
+原因：
+- 平台搜索API必须用Cookie认证（不是Bearer Token）
+- URL必须带完整参数（instrumentType/region/delay/universe）
+- searchFields() 内部已处理登录、Cookie缓存、参数拼接
+```
+
+**正确用法**：
+```javascript
+// 直接调用，无需处理认证
+searchFields("operating cash flow")                    // 关键词搜索
+searchFields("earnings", {datasetId: "fundamental6"})  // 限定数据集
+getFieldsByDataset("scl12")                            // 获取数据集全部字段
+```
+
+**认证机制**：
+- searchFields() 自动读取 config.json 的账号密码
+- 首次调用：登录 → 获取Cookie → 缓存4小时 → 执行搜索
+- 后续调用：读缓存Cookie → 未过期直接搜索 / 过期自动重新登录
+- 不需要AI手动处理任何认证逻辑
+
 ### 批量挖掘策略
 
 1. 先小批量验证模板（3-5个字段）
