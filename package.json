@@ -1,6 +1,6 @@
 {
   "name": "wq-buddy",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "WQBuddy - WorldQuant BRAIN Alpha挖掘AI协作工具",
   "type": "module",
   "main": "dist/tools.js",
@@ -38,8 +38,7 @@
     "skill/",
     "config.example.json",
     "openclaw.plugin.json",
-    "README.md",
-    "SKILL.md"
+    "README.md"
   ],
   "author": "",
   "license": "MIT",
@@ -47,13 +46,16 @@
     "node": ">=18.0.0"
   },
   "openclaw": {
-    "extensions": ["./dist/tools.js"],
+    "extensions": [
+      "./dist/plugin-entry.js"
+    ],
     "compat": {
       "pluginApi": ">=2026.3.1",
       "minGatewayVersion": "2026.3.1"
     }
   },
   "dependencies": {
+    "@sinclair/typebox": "^0.34.49",
     "@types/better-sqlite3": "^7.6.13",
     "axios": "^1.6.0",
     "better-sqlite3": "^12.9.0",

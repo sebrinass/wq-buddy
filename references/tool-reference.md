@@ -2,198 +2,208 @@
 
 ## 目录
 
-- 可用工具函数
-- 工具分类说明
+- 调用方式（CLI + 注册工具双模式）
+- 可用工具一览
+- 注册工具详细参数
+- 数据库操作
 - 典型工作流
 
 ---
 
-## 可用工具函数
+## 调用方式（CLI + 注册工具双模式）
 
-### 回测与提交
+WQBuddy 支持两种调用方式：
 
-| 函数 | 用途 | 关键参数 | 返回内容 |
-|------|------|----------|----------|
-| `alphaBatchSubmit()` | 批量回测 | template, fields[], concurrency(1-3) | 中文结果 + IS Checks |
-| `alphaPreview()` | 预览模式（不保存） | template, fields[] | 表达式预览 + 配置展示 |
-| `alphaStats()` | 回测统计报告 | options?(limit, groupBy, statusFilter, dateFrom, dateTo) | 中文统计报告 |
-| `checkDuplicate()` | 检查重复表达式 | expression, settingsHash? | {isDuplicate, existingRecord?} |
+| 方式 | 适用场景 | 示例 |
+|------|----------|------|
+| **CLI命令** | 终端直接操作、脚本集成 | `wq backtest "rank(cash_flow)"` |
+| **注册工具** | OpenClaw Agent自动调用 | `alphaBatchSubmit({expressions: ["rank(cash_flow)"]})` |
 
-### 格式化与显示
-
-| 函数 | 用途 | 关键参数 | 返回内容 |
-|------|------|----------|----------|
-| `formatResults()` | 格式化回测结果 | results[] | 中文表格 |
-| `formatAnalysisResult()` | 格式化字段分析结果 | result | 中文分析报告 |
-| `formatSearchResults()` | 格式化搜索结果 | SearchResult | 中文字段列表 |
-
-### 字段搜索（平台API）
-
-| 函数 | 用途 | 关键参数 | 返回内容 |
-|------|------|----------|----------|
-| `searchFields()` | 按关键词搜索数据字段 | keyword, options?(datasetId, dataType, limit) | SearchResult{fields, totalCount, searchKeyword, datasetId} |
-| `getFieldsByDataset()` | 获取指定数据集全部字段 | datasetId, options?(dataType, limit) | SearchResult（内部调用searchFields） |
-
-### 字段分析
-
-| 函数 | 用途 | 关键参数 | 返回内容 |
-|------|------|----------|----------|
-| `analyzeField()` | 字段分析（6种标准测试） | fieldName, autoSave? | FieldAnalysisResult |
-
-### 数据库操作 - Alpha
-
-| 函数 | 用途 | 关键参数 | 返回内容 |
-|------|------|----------|----------|
-| `db.insertAlpha()` | 插入Alpha记录 | Omit\<AlphaRecord, 'id'\> | 新记录ID |
-| `db.updateAlphaStatus()` | 更新回测状态 | id, status, alphaId?, errorMessage? | 无 |
-| `db.updateSubmitStatus()` | 更新提交状态 | id, status, reason? | 无 |
-| `db.updateCorrelation()` | 更新相关性 | id, max, min | 无 |
-| `db.getAlpha()` | 获取单条记录 | id | AlphaRecord \| null |
-| `db.searchAlphas()` | 查询Alpha | filters{} | 记录列表 |
-| `db.sortAlphas()` | 排序Alpha | sortBy, order? | 记录列表 |
-| `db.getAlphaStats()` | 基础统计 | 无 | DbStats{total, success, failed, avg_sharpe, best_sharpe} |
-| `db.getAlphaStatsAdvanced()` | 高级统计 | AlphaStatsOptions? | AlphaStatsResult（含分组、分布） |
-| `db.exportAlphasToCsv()` | 导出CSV | path | 无 |
-
-### 数据库操作 - 字段分析
-
-| 函数 | 用途 | 关键参数 | 返回内容 |
-|------|------|----------|----------|
-| `db.insertFieldAnalysis()` | 插入字段分析 | Omit\<FieldAnalysis, 'id'\|'created_at'\> | 新记录ID |
-| `db.updateFieldAnalysis()` | 更新字段分析 | id, updates | 无 |
-| `db.getFieldAnalysis()` | 获取字段分析 | fieldName | FieldAnalysis \| null |
-| `db.searchFieldAnalysis()` | 搜索字段分析 | filters{} | 记录列表 |
-| `db.exportFieldAnalysisToCsv()` | 导出CSV | path | 无 |
-
-### 数据库操作 - 数据字段
-
-| 函数 | 用途 | 关键参数 | 返回内容 |
-|------|------|----------|----------|
-| `db.insertDataField()` | 插入数据字段 | Omit\<DataField, 'id'\> | 新记录ID |
-| `db.getDataFields()` | 获取字段列表 | datasetId? | DataField[] |
-| `db.getDataField()` | 获取单个字段 | fieldId | DataField \| null |
-
-### 数据库操作 - 批次
-
-| 函数 | 用途 | 关键参数 | 返回内容 |
-|------|------|----------|----------|
-| `db.insertBatch()` | 插入批次记录 | Omit\<BatchRecord, 'id'\> | 新记录ID |
-| `db.updateBatchStatus()` | 更新批次状态 | batchId, updates | 无 |
-| `db.getBatch()` | 获取批次 | batchId | BatchRecord \| null |
-| `db.getAllBatches()` | 获取所有批次 | 无 | BatchRecord[] |
-
-### 数据库操作 - 生命周期
-
-| 函数 | 用途 | 关键参数 | 返回内容 |
-|------|------|----------|----------|
-| `getDatabase()` | 获取数据库实例 | config? | db对象 |
-| `closeDatabase()` | 关闭数据库连接 | 无 | 无 |
-| `db.init()` | 初始化数据库 | 无 | 无 |
-| `db.close()` | 关闭连接 | 无 | 无 |
+注册工具通过 `openclaw/plugin-sdk/plugin-entry` 的 `definePluginEntry` 注册，Agent根据工具description自动判断何时调用。
 
 ---
 
-## 工具分类说明
+## 可用工具一览
 
-### 自动调用 vs 手动调用
+### 回测与提交
 
-**自动调用**（AI在流程中自动使用，无需用户指定）：
-- `checkDuplicate()`: 在 `alphaBatchSubmit()` 内部自动调用（当enableCheckDuplicate=true时）
-- `formatResults()`: 回测完成后自动格式化
-- `getDatabase()`: 需要数据库操作时自动获取
+| 注册工具名 | CLI命令 | 用途 | 关键参数 |
+|------------|---------|------|----------|
+| alphaBatchSubmit | wq backtest | 批量回测 | expressions[], concurrency?(1-3), neutralization?, delay?, decay?, universe?, region? |
+| alphaStats | wq stats | 回测统计报告 | status?, limit? |
 
-**手动调用**（AI根据用户意图选择使用）：
-- `alphaBatchSubmit()`: 用户要求回测时
-- `alphaPreview()`: 用户想先看结果不保存时
-- `alphaStats()`: 用户想看整体统计时
-- `analyzeField()`: 用户要求分析字段时
-- `searchFields()` / `getFieldsByDataset()`: 用户想查找可用数据字段时
-- `db.updateSubmitStatus()`: 用户告知提交结果时
-- `db.updateCorrelation()`: 用户告知相关性数值时
+### 字段搜索与分析
 
-### alphaStats() 详解
+| 注册工具名 | CLI命令 | 用途 | 关键参数 |
+|------------|---------|------|----------|
+| searchFields | wq search | 搜索数据字段 | query, dataset?, limit? |
+| analyzeField | wq analyze | 字段分析(6项测试) | fieldName, save?(默认true) |
 
-**用途**：生成回测统计报告，了解整体挖掘进展。
+### 状态管理
 
-**参数**（AlphaStatsOptions，均可选）：
+| 注册工具名 | CLI命令 | 用途 | 关键参数 |
+|------------|---------|------|----------|
+| updateSubmitStatus | (仅注册工具) | 更新提交状态 | id, status, reason? |
+| updateCorrelation | (仅注册工具) | 更新相关性 | id, correlationMax?, correlationMin? |
 
-| 参数 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| limit | number | 100 | 统计最近N条记录 |
-| offset | number | 0 | 偏移量 |
-| groupBy | string | 'none' | 分组方式：field / expression / status / submit_status / none |
-| statusFilter | string | '' | 按状态过滤 |
-| dateFrom | string | '' | 起始日期 |
-| dateTo | string | '' | 截止日期 |
+### 格式化与显示（内部自动调用）
 
-**输出内容**：
-- 总览：总条数、成功/失败数、可提交/已通过数
-- Sharpe/Turnover/Fitness/Returns/Drawdown分布（平均/中位数/最佳/分段统计）
-- 按分组字段的分组统计（当groupBy不为none时）
+| 函数 | 用途 | 返回内容 |
+|------|------|----------|
+| formatResults() | 格式化回测结果 | 中文表格 |
+| formatAnalysisResult() | 格式化字段分析结果 | 中文分析报告 |
+| formatSearchResults() | 格式化搜索结果 | 中文字段列表 |
 
-### searchFields() 详解
+### 其他CLI命令
 
-**用途**：通过关键词搜索BRAIN平台的数据字段。
+| CLI命令 | 用途 |
+|---------|------|
+| wq export [alpha\|field] [路径] | 导出CSV |
+| wq docs | 查看运算符文档 |
 
-**⚠️ 调用规范（重要！）**
+---
 
-```
-❌ 错误：AI自己写HTTP请求、手动处理Cookie、用Bearer Token认证
-✅ 正确：直接调用 searchFields() 函数，内部已处理所有认证逻辑
+## 注册工具详细参数
 
-原因：
-- 平台搜索API必须用Cookie认证（Bearer Token会返回401）
-- URL必须带完整参数（instrumentType/region/delay/universe）
-- 缺少参数会返回400错误
-- searchFields() 内部已处理：登录 → Cookie缓存 → 参数拼接 → 请求发送
-```
+### alphaBatchSubmit
 
-**参数**：
+批量提交Alpha表达式进行回测。
 
-| 参数 | 类型 | 必选 | 说明 |
+**注册工具调用**: `alphaBatchSubmit({expressions, concurrency?, neutralization?, delay?, decay?, universe?, region?})`
+
+**CLI调用**: `wq backtest "expr1" "expr2" --concurrency 2`
+
+| 参数 | 类型 | 必填 | 默认 | 说明 |
+|------|------|------|------|------|
+| expressions | string[] | 是 | - | Alpha表达式列表 |
+| concurrency | number | 否 | 1 | 并发数，范围1-3 |
+| neutralization | string | 否 | config | 中和方式: NONE/MARKET/INDUSTRY/SUBINDUSTRY |
+| delay | number | 否 | config | 延迟天数 |
+| decay | number | 否 | config | 衰减天数 |
+| universe | string | 否 | config | 股票池 |
+| region | string | 否 | config | 区域 |
+
+**默认配置来源**: config.json（中性化INDUSTRY、延迟1、universe TOP3000等）
+
+**失败策略**: 单条失败跳过继续，不中断整体
+
+**回测前确认**: 执行前必须向用户展示确认单，等待确认后再运行
+
+**回测后闭环**: 完成后检查空字段，有可提交Alpha时强制提醒用户查平台
+
+**去重机制**: `checkDuplicate()` 在 `alphaBatchSubmit()` 内部自动调用（当enableCheckDuplicate=true时）
+
+### searchFields
+
+搜索BRAIN平台数据字段。
+
+**注册工具调用**: `searchFields({query, dataset?, limit?})`
+
+**CLI调用**: `wq search "earnings" --dataset fundamental6 --limit 100`
+
+| 参数 | 类型 | 必填 | 默认 | 说明 |
+|------|------|------|------|------|
+| query | string | 是 | - | 搜索关键词 |
+| dataset | string | 否 | - | 限定数据集ID（如fundamental6、pv1、scl12） |
+| limit | number | 否 | 50 | 返回数量上限 |
+
+**认证机制**: 工具内部自动处理Cookie认证（登录→缓存4小时→自动续期），无需手动干预
+
+**典型用法**:
+- `searchFields({query: "ebit"})` — 搜索含ebit的字段
+- `searchFields({query: "earnings", dataset: "fundamental6"})` — 在基本面数据集中搜索
+- `searchFields({query: "", dataset: "scl12", limit: 200})` — 获取scl12全部字段
+
+### analyzeField
+
+对指定字段执行6种标准测试表达式回测。
+
+**注册工具调用**: `analyzeField({fieldName, save?})`
+
+**CLI调用**: `wq analyze fnd2_ebitdm`
+
+| 参数 | 类型 | 必填 | 默认 | 说明 |
+|------|------|------|------|------|
+| fieldName | string | 是 | - | 字段名 |
+| save | boolean | 否 | true | 是否保存分析结果到数据库 |
+
+**6项标准测试**: 覆盖率 / 非零覆盖率 / 更新频率 / 数据范围 / 中位数 / 数据分布
+
+**分析配置**: 自动使用 Neutralization=None, Decay=0（确保看到原始数据特性）
+
+### alphaStats
+
+获取Alpha回测统计报告。
+
+**注册工具调用**: `alphaStats({status?, limit?})`
+
+**CLI调用**: `wq stats`
+
+| 参数 | 类型 | 必填 | 默认 | 说明 |
+|------|------|------|------|------|
+| status | string | 否 | - | 按状态过滤 |
+| limit | number | 否 | 100 | 统计最近N条记录 |
+
+**输出内容**: 总览、Sharpe/Turnover/Fitness/Returns/Drawdown分布、按分组统计
+
+### updateSubmitStatus
+
+更新Alpha记录的提交状态。
+
+**注册工具调用**: `updateSubmitStatus({id, status, reason?})`
+
+| 参数 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| keyword | string | 是 | 搜索关键词 |
-| options.datasetId | string | 否 | 限定数据集（如fundamental6、pv1、scl12） |
-| options.dataType | string | 否 | 数据类型（如MATRIX、VECTOR） |
-| options.limit | number | 否 | 返回数量上限，默认50 |
+| id | number | 是 | Alpha记录ID |
+| status | string | 是 | 新状态: 已通过 / 提交失败 |
+| reason | string | 否 | 失败原因（提交失败时填写） |
 
-**返回**：SearchResult{fields[], totalCount, searchKeyword, datasetId}
+### updateCorrelation
 
-**典型用法**：
-- `searchFields("ebit")` — 搜索含ebit的字段
-- `searchFields("earnings", {datasetId: "fundamental6"})` — 在基本面数据集中搜索
-- `searchFields("", {datasetId: "scl12", limit: 200})` — 获取scl12全部字段
+更新Alpha记录的Self Correlation数值。
 
-**认证机制**：
-- 自动读取 config.json 的账号密码
-- Cookie缓存4小时，过期自动重新登录
-- AI不需要手动处理任何认证逻辑
+**注册工具调用**: `updateCorrelation({id, correlationMax?, correlationMin?})`
 
-### getFieldsByDataset() 详解
-
-**用途**：获取指定数据集的全部可用字段，是searchFields的快捷方式。
-
-**参数**：
-
-| 参数 | 类型 | 必选 | 说明 |
+| 参数 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| datasetId | string | 是 | 数据集ID |
-| options.dataType | string | 否 | 默认MATRIX |
-| options.limit | number | 否 | 默认200 |
+| id | number | 是 | Alpha记录ID |
+| correlationMax | number | 否 | Self Correlation最大值 (0-1) |
+| correlationMin | number | 否 | Self Correlation最小值 (0-1) |
 
-**返回**：与searchFields相同（SearchResult）
+至少提供 correlationMax 或 correlationMin 之一。只提供一个时，另一个保持当前值不变。
 
-**典型用法**：
-- `getFieldsByDataset("fundamental6")` — 获取基本面数据集全部字段
-- `getFieldsByDataset("scl12", {dataType: "VECTOR"})` — 获取scl12的向量字段
+---
 
-### 去重机制
+## 数据库操作
 
-`checkDuplicate()` 的工作方式：
-1. 根据表达式内容搜索已有记录
-2. 如果找到相同表达式 + 相同settings_hash的成功记录 → 判定为重复
-3. 重复时跳过提交，返回已有记录信息
-4. settings_hash不同 = 配置不同 = 不算重复（允许同一表达式不同配置测试）
+### Alpha操作
+
+| 函数 | 用途 | 关键参数 |
+|------|------|----------|
+| db.insertAlpha() | 插入Alpha记录 | Omit\<AlphaRecord, 'id'\> |
+| db.updateAlphaStatus() | 更新回测状态 | id, status, alphaId?, errorMessage? |
+| db.updateSubmitStatus() | 更新提交状态 | id, status, reason? |
+| db.updateCorrelation() | 更新相关性 | id, max, min |
+| db.getAlpha() | 获取单条记录 | id |
+| db.searchAlphas() | 查询Alpha | filters{} |
+| db.getAlphaStatsAdvanced() | 高级统计 | AlphaStatsOptions? |
+| db.exportAlphasToCsv() | 导出CSV | path |
+
+### 字段分析操作
+
+| 函数 | 用途 | 关键参数 |
+|------|------|----------|
+| db.insertFieldAnalysis() | 插入字段分析 | Omit\<FieldAnalysis, 'id'\|'created_at'\> |
+| db.updateFieldAnalysis() | 更新字段分析 | id, updates |
+| db.getFieldAnalysis() | 获取字段分析 | fieldName |
+| db.exportFieldAnalysisToCsv() | 导出CSV | path |
+
+### 生命周期
+
+| 函数 | 用途 |
+|------|------|
+| getDatabase() | 获取数据库实例（单例） |
+| closeDatabase() | 关闭数据库连接 |
 
 ---
 
@@ -202,9 +212,10 @@
 ### 工作流A：批量回测
 
 ```
-输入: 基础Alpha + 字段列表
+输入: 表达式列表
   ↓
-调用: alphaBatchSubmit({template, fields, concurrency: 2})
+调用: alphaBatchSubmit({expressions, concurrency: 2})
+  或: wq backtest "expr1" "expr2" --concurrency 2
   ↓
 输出: 中文结果表格（含状态标签）
   ↓
@@ -216,38 +227,30 @@
 ### 工作流B：字段勘探
 
 ```
-输入: 字段名
+输入: 关键词或字段名
   ↓
-第一步: 查本地 db.searchFieldAnalysis({field_name: keyword})
-  ├── 已有 → 直接使用
-  └── 无 → 继续
+第一步: 搜平台 searchFields({query: "keyword"})
+  或: wq search "keyword"
   ↓
-第二步: 搜平台 searchFields({keyword})
-  ↓
-调用: analyzeField(fieldName)
+第二步: 分析字段 analyzeField({fieldName: "fnd2_ebitdm"})
+  或: wq analyze fnd2_ebitdm
   ↓
 输出: 结构化字段分析报告
   ↓
-询问: 用户是否保存/继续深入测试
+第三步: 构建表达式并回测
 ```
-
-字段分析方法论详见 [field-analysis.md](field-analysis.md)
 
 ### 工作流C：状态更新
 
 ```
-输入: "Alpha j2dPWOn5 相关性太高了 0.9696 不能提交"
-  ↓
-解析: alphaId, max, status, reason
+输入: "Alpha #5 相关性太高了 0.9696 不能提交"
   ↓
 调用:
-  - db.updateSubmitStatus(id, '提交失败', reason)
-  - db.updateCorrelation(id, max, min)
+  updateSubmitStatus({id: 5, status: "提交失败", reason: "Self Correlation 0.9696"})
+  updateCorrelation({id: 5, correlationMax: 0.9696})
   ↓
 确认: "已更新！状态: 提交失败 | 原因: ..."
 ```
-
-提交流程详见 [submission-workflow.md](submission-workflow.md)
 
 ### 工作流D：统计查看
 
@@ -255,12 +258,9 @@
 输入: "看看最近回测的整体情况"
   ↓
 调用: alphaStats({limit: 100})
+  或: wq stats
   ↓
 输出: 统计报告（总览 + 指标分布）
-  ↓
-可选: 按字段分组查看
-  - alphaStats({groupBy: 'field'})
-  - alphaStats({groupBy: 'submit_status'})
 ```
 
 ### 工作流E：数据集探索
@@ -268,12 +268,8 @@
 ```
 输入: "scl12数据集有哪些字段"
   ↓
-调用: getFieldsByDataset("scl12")
+调用: searchFields({query: "", dataset: "scl12", limit: 200})
+  或: wq search --dataset scl12
   ↓
 输出: 字段列表（ID + 描述）
-  ↓
-可选: 按关键词在数据集内搜索
-  - searchFields("sentiment", {datasetId: "scl12"})
 ```
-
-数据集经验详见 [data-type-strategy.md](data-type-strategy.md)

@@ -38,7 +38,7 @@ npm run dev                          # 交互模式
 - 帮你提炼论文思路转化为可测试的表达式
 - 随使用积累经验，越来越懂你的数据偏好
 
-详见 [SKILL.md](SKILL.md)
+详见 [SKILL.md](skill/SKILL.md)
 
 ## 命令速查
 
