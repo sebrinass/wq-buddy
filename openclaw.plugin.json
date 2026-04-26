@@ -11,7 +11,12 @@
       "analyzeField",
       "alphaStats",
       "updateSubmitStatus",
-      "updateCorrelation"
+      "updateCorrelation",
+      "checkSubmission",
+      "submitAlpha",
+      "getAlphaCorrelations",
+      "listAlphas",
+      "getUserInfo"
     ]
   },
   "configSchema": {

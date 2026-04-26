@@ -45,7 +45,11 @@ const alphas = sqliteTable('alphas', {
   correlation_min: real('correlation_min'),   // Minimum相关性
   
   // 失败原因/备注（手动填写）
-  reject_reason: text('reject_reason')        // 提交失败的原因说明
+  reject_reason: text('reject_reason'),       // 提交失败的原因说明
+  
+  // 表达式模板和相似组
+  expression_template: text('expression_template'),  // 表达式模板
+  similarity_group: text('similarity_group')         // 相似组标识
 });
 
 const fieldAnalyses = sqliteTable('field_analyses', {
@@ -128,7 +132,11 @@ export class SQLiteAdapter implements DatabaseInterface {
         correlation_min REAL,
         
         -- 失败原因/备注
-        reject_reason TEXT
+        reject_reason TEXT,
+        
+        -- 表达式模板和相似组
+        expression_template TEXT DEFAULT '',
+        similarity_group TEXT DEFAULT ''
       );
 
       CREATE TABLE IF NOT EXISTS field_analyses (
@@ -199,6 +207,12 @@ export class SQLiteAdapter implements DatabaseInterface {
       if (!columnNames.includes('reject_reason')) {
         this.sqlite.exec("ALTER TABLE alphas ADD COLUMN reject_reason TEXT");
       }
+      if (!columnNames.includes('expression_template')) {
+        this.sqlite.exec("ALTER TABLE alphas ADD COLUMN expression_template TEXT DEFAULT ''");
+      }
+      if (!columnNames.includes('similarity_group')) {
+        this.sqlite.exec("ALTER TABLE alphas ADD COLUMN similarity_group TEXT DEFAULT ''");
+      }
     } catch (e) {
       // 忽略升级错误
     }
@@ -243,7 +257,11 @@ export class SQLiteAdapter implements DatabaseInterface {
       correlation_min: record.correlationMin || null,
       
       // 失败原因/备注
-      reject_reason: record.rejectReason || null
+      reject_reason: record.rejectReason || null,
+      
+      // 表达式模板和相似组
+      expression_template: record.expression_template || null,
+      similarity_group: record.similarity_group || null
     }).run();
 
     return result.lastInsertRowid as number;
@@ -280,6 +298,53 @@ export class SQLiteAdapter implements DatabaseInterface {
     this.db.update(alphas).set(updateData).where(eq(alphas.id, id)).run();
     
     info(`已更新Alpha ID=${id} 的提交状态: ${status}${rejectReason ? ' | 原因: ' + rejectReason : ''}`);
+  }
+
+  async updateAlphaCorrelation(alphaId: string, correlationMax?: number, correlationMin?: number): Promise<void> {
+    const updateData: any = {
+      updated_at: new Date().toISOString()
+    };
+    if (correlationMax !== undefined) updateData.correlation_max = correlationMax;
+    if (correlationMin !== undefined) updateData.correlation_min = correlationMin;
+
+    this.db.update(alphas).set(updateData).where(eq(alphas.alpha_id, alphaId)).run();
+
+    info(`已更新Alpha ${alphaId} 的相关性: Max=${correlationMax ?? '不变'}, Min=${correlationMin ?? '不变'}`);
+  }
+
+  async updateAlphaSubmitStatusByAlphaId(alphaId: string, status: string, rejectReason?: string): Promise<void> {
+    const updateData: any = {
+      submit_status: status,
+      updated_at: new Date().toISOString()
+    };
+
+    if (rejectReason !== undefined) {
+      updateData.reject_reason = rejectReason;
+    }
+
+    this.db.update(alphas).set(updateData).where(eq(alphas.alpha_id, alphaId)).run();
+
+    info(`已更新Alpha ${alphaId} 的提交状态: ${status}${rejectReason ? ' | 原因: ' + rejectReason : ''}`);
+  }
+
+  async getAlphaByAlphaId(alphaId: string): Promise<AlphaRecord | null> {
+    const result = this.db.select().from(alphas).where(eq(alphas.alpha_id, alphaId)).get();
+    return result ? this.mapToAlphaRecord(result) : null;
+  }
+
+  async saveDataFields(fields: Omit<DataField, 'id'>[]): Promise<void> {
+    for (const field of fields) {
+      try {
+        // 尝试插入，如果field_id已存在则跳过
+        const existing = await this.getDataField(field.field_id);
+        if (!existing) {
+          await this.insertDataField(field);
+        }
+      } catch (e) {
+        // 忽略单条插入错误
+      }
+    }
+    info(`已缓存 ${fields.length} 个数据字段`);
   }
 
   async getAlpha(id: number): Promise<AlphaRecord | null> {
@@ -737,6 +802,8 @@ export class SQLiteAdapter implements DatabaseInterface {
       correlationMax: r.correlation_max ?? undefined,
       correlationMin: r.correlation_min ?? undefined,
       rejectReason: r.reject_reason ?? undefined,
+      expression_template: r.expression_template ?? undefined,
+      similarity_group: r.similarity_group ?? undefined,
       canSubmit: undefined
     };
   }

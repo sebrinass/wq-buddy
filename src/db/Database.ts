@@ -37,6 +37,10 @@ export interface AlphaRecord {
   // 失败原因/备注（手动填写）
   rejectReason?: string;     // 提交失败的原因说明
   
+  // 表达式模板和相似组
+  expression_template?: string;  // 表达式模板
+  similarity_group?: string;     // 相似组标识
+  
   // 计算属性：是否可提交（基于IS Checks）
   canSubmit?: boolean;
 }
@@ -130,6 +134,10 @@ export interface Database {
   updateAlphaStatus(id: number, status: string, alphaId?: string, errorMessage?: string): Promise<void>;
   updateCorrelation(id: number, max: number, min: number): Promise<void>;  // 更新自相关性
   updateSubmitStatus(id: number, status: string, rejectReason?: string): Promise<void>;  // 更新提交状态
+  updateAlphaCorrelation(alphaId: string, correlationMax?: number, correlationMin?: number): Promise<void>;  // 按alpha_id更新相关性
+  updateAlphaSubmitStatusByAlphaId(alphaId: string, status: string, rejectReason?: string): Promise<void>;  // 按alpha_id更新提交状态
+  getAlphaByAlphaId(alphaId: string): Promise<AlphaRecord | null>;  // 按alpha_id查询记录
+  saveDataFields(fields: Omit<DataField, 'id'>[]): Promise<void>;  // 批量保存数据字段缓存
   getAlpha(id: number): Promise<AlphaRecord | null>;
   searchAlphas(filters: Record<string, string>): Promise<AlphaRecord[]>;
   sortAlphas(sortBy: string, order?: 'asc' | 'desc'): Promise<AlphaRecord[]>;

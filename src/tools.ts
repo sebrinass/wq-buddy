@@ -1,9 +1,11 @@
 import axios, { AxiosInstance } from 'axios';
 import * as crypto from 'crypto';
 import { loadConfig, getDefaultSettings } from './config.js';
+import { SimulationSettings } from './types.js';
 import { info, warn, error as logError, debug } from './logger.js';
 import { getDatabase, closeDatabase } from './db/index.js';
 import { Authenticator } from './auth.js';
+import { getAlphaCorrelations } from './alpha-check.js';
 import type { AlphaRecord as DbAlphaRecord, FieldAnalysis, AlphaStatsOptions } from './db/Database.js';
 
 export interface AlphaMetrics {
@@ -49,14 +51,13 @@ export interface AlphaResult extends AlphaMetrics {
 }
 
 export interface BatchSubmitParams {
-  /** Alpha表达式列表（必填），每条为完整的alpha表达式 */
   expressions: string[];
   username?: string;
   password?: string;
   autoConfirm?: boolean;
   enableCheckDuplicate?: boolean;
-  /** 并发数 1-3，默认1 */
   concurrency?: number;
+  settingsOverrides?: Partial<SimulationSettings>;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -376,6 +377,23 @@ async function submitSingleAlpha(
         canSubmit: calculateSubmitStatus(alphaMetrics.checks) === '可提交(待查)'
       };
 
+      // 回测成功且可提交时，自动查询相关性
+      if (alphaResult.canSubmit && result.alpha) {
+        try {
+          info('IS检查全部通过，自动查询相关性...');
+          const db = await getDatabase();
+          const corrResult = await getAlphaCorrelations(result.alpha, session, cookie, db);
+          if (corrResult.correlationMax !== undefined) {
+            alphaResult.correlationMax = corrResult.correlationMax;
+          }
+          if (corrResult.correlationMin !== undefined) {
+            alphaResult.correlationMin = corrResult.correlationMin;
+          }
+        } catch (corrErr: any) {
+          warn('自动查询相关性失败，不影响主流程', corrErr.message);
+        }
+      }
+
       info(`${result.status === 'COMPLETE' ? '✅' : '❌'} Alpha ID: ${result.alpha || 'N/A'} | ${field}`);
 
       await saveResult(alphaResult, settingsHashValue);
@@ -407,7 +425,7 @@ export async function alphaBatchSubmit(params: BatchSubmitParams): Promise<{
   };
   duplicates: { field: string; expression: string; existingId: string }[];
 }> {
-  const { expressions, username, password, enableCheckDuplicate = false, concurrency = 1 } = params;
+  const { expressions, username, password, enableCheckDuplicate = false, concurrency = 1, settingsOverrides } = params;
 
   // 校验表达式列表
   if (!expressions || expressions.length === 0) {
@@ -442,6 +460,9 @@ export async function alphaBatchSubmit(params: BatchSubmitParams): Promise<{
   const { session, cookie } = await getSession(user, pass);
 
   const settings = getDefaultSettings(config);
+  if (settingsOverrides) {
+    Object.assign(settings, settingsOverrides);
+  }
   const settingsHashValue = settingsHash(settings);
   const results: AlphaResult[] = [];
   const duplicates: { field: string; expression: string; existingId: string }[] = [];
@@ -603,6 +624,13 @@ export function formatResults(results: AlphaResult[]): string {
         const pendingCount = r.checks.filter(c => c.result === 'PENDING').length;
         
         output += `   🔬 IS检查: ✅通过${passCount}项 ❌失败${failCount}项 ⏳待定${pendingCount}项\n`;
+        
+        // 判断IS结果（PENDING忽略，只看FAIL）
+        if (failCount > 0) {
+          output += `   IS结果：❌ 不可提交\n`;
+        } else {
+          output += `   IS结果：✅ 可提交\n`;
+        }
         
         const failedChecks = r.checks.filter(c => c.result === 'FAIL');
         if (failedChecks.length > 0) {

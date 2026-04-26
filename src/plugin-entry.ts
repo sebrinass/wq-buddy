@@ -1,13 +1,18 @@
 /**
  * WQBuddy OpenClaw Plugin Entry
  *
- * Registers 6 tools for WorldQuant BRAIN Alpha mining workflow:
+ * Registers 11 tools for WorldQuant BRAIN Alpha mining workflow:
  * - alphaBatchSubmit: Batch backtest Alpha expressions
  * - searchFields: Search BRAIN data fields
  * - analyzeField: Analyze field characteristics
  * - alphaStats: Backtest statistics report
  * - updateSubmitStatus: Update Alpha submission status
  * - updateCorrelation: Update Alpha correlation values
+ * - checkSubmission: Check Alpha IS checks before submission
+ * - submitAlpha: Submit Alpha to BRAIN platform
+ * - getAlphaCorrelations: Get Alpha correlation data
+ * - listAlphas: List user's Alphas
+ * - getUserInfo: Get current user info
  */
 
 import { Type } from "@sinclair/typebox";
@@ -15,10 +20,34 @@ import { definePluginEntry, type AnyAgentTool } from "openclaw/plugin-sdk/plugin
 import { alphaBatchSubmit, formatResults, alphaStats } from "./tools.js";
 import { searchFields, formatSearchResults } from "./search.js";
 import { analyzeField, formatAnalysisResult } from "./analyze-field.js";
+import { checkSubmission, formatCheckResult, getAlphaCorrelations, formatCorrelationResult } from "./alpha-check.js";
+import { submitAlpha, formatSubmitResult } from "./alpha-submit.js";
+import { listAlphas, formatAlphaList } from "./alpha-list.js";
+import { getUserInfo, formatUserInfo } from "./user-info.js";
 import { getDatabase } from "./db/index.js";
-import { loadConfig } from "./config.js";
-import { CONFIG_PATH } from "./paths.js";
-import * as fs from "fs";
+import { loadConfig, getDefaultSettings } from "./config.js";
+import { Authenticator } from "./auth.js";
+
+// ── 辅助函数：获取认证session ──────────────────────────────────
+
+async function getAuthSession(): Promise<{ session: any; cookie: string }> {
+  const config = loadConfig();
+  if (!config) {
+    throw new Error('配置文件加载失败');
+  }
+
+  const creds = config.credentials;
+  if (!creds.username || !creds.password) {
+    throw new Error('请在 config.json 中配置账号密码');
+  }
+
+  const cached = await Authenticator.getSessionWithCookie(creds.username);
+  if (cached) {
+    return cached;
+  }
+
+  return await Authenticator.loginWithCookie(creds.username, creds.password);
+}
 
 // ── Tool Schemas ──────────────────────────────────────────────
 
@@ -159,6 +188,65 @@ const UpdateCorrelationSchema = Type.Object(
   { additionalProperties: false },
 );
 
+const CheckSubmissionSchema = Type.Object(
+  {
+    alphaId: Type.String({
+      description: "BRAIN平台的Alpha ID",
+    }),
+  },
+  { additionalProperties: false },
+);
+
+const SubmitAlphaSchema = Type.Object(
+  {
+    alphaId: Type.String({
+      description: "BRAIN平台的Alpha ID",
+    }),
+    confirmed: Type.Boolean({
+      description: "用户是否已确认提交，必须为true才执行",
+    }),
+  },
+  { additionalProperties: false },
+);
+
+const GetAlphaCorrelationsSchema = Type.Object(
+  {
+    alphaId: Type.String({
+      description: "BRAIN平台的Alpha ID",
+    }),
+  },
+  { additionalProperties: false },
+);
+
+const ListAlphasSchema = Type.Object(
+  {
+    status: Type.Optional(
+      Type.String({
+        description: "筛选状态",
+      }),
+    ),
+    limit: Type.Optional(
+      Type.Number({
+        description: "返回数量，默认20",
+        minimum: 1,
+        maximum: 100,
+      }),
+    ),
+    offset: Type.Optional(
+      Type.Number({
+        description: "分页偏移，默认0",
+        minimum: 0,
+      }),
+    ),
+  },
+  { additionalProperties: false },
+);
+
+const GetUserInfoSchema = Type.Object(
+  {},
+  { additionalProperties: false },
+);
+
 // ── Tool Definitions ──────────────────────────────────────────
 
 const alphaBatchSubmitTool: AnyAgentTool = {
@@ -167,7 +255,7 @@ const alphaBatchSubmitTool: AnyAgentTool = {
   description:
     "批量提交Alpha表达式进行回测。返回每个表达式的回测结果，包括Sharpe、换手率、保证金、IS检查等指标。" +
     "回测前必须向用户展示确认单（表达式列表、配置、并发数），等待用户确认后再执行。" +
-    "支持通过参数覆盖config.json中的默认设置（neutralization/delay/decay/universe/region）。",
+    "支持通过参数覆盖config.json中的默认设置（neutralization/delay/decay/universe/region），覆盖仅在内存中生效，不修改配置文件。",
   parameters: AlphaBatchSubmitSchema,
   execute: async (_toolCallId: string, rawParams: Record<string, unknown>) => {
     const expressions = rawParams.expressions as string[];
@@ -182,38 +270,21 @@ const alphaBatchSubmitTool: AnyAgentTool = {
       throw new Error("表达式列表不能为空");
     }
 
-    // Handle config overrides: temporarily modify config.json
-    const overrides: Record<string, unknown> = {};
-    if (neutralization) overrides.neutralization = neutralization;
-    if (delay !== undefined) overrides.delay = delay;
-    if (decay !== undefined) overrides.decay = decay;
-    if (universe) overrides.universe = universe;
-    if (region) overrides.region = region;
+    // 配置覆盖改为内存方式：直接构建settingsOverrides传给alphaBatchSubmit
+    const settingsOverrides: Record<string, unknown> = {};
+    if (neutralization) settingsOverrides.neutralization = neutralization;
+    if (delay !== undefined) settingsOverrides.delay = delay;
+    if (decay !== undefined) settingsOverrides.decay = decay;
+    if (universe) settingsOverrides.universe = universe;
+    if (region) settingsOverrides.region = region;
 
-    let configBackup: string | null = null;
-
-    if (Object.keys(overrides).length > 0) {
-      const config = loadConfig();
-      if (config) {
-        configBackup = JSON.stringify(config);
-        const settings = config.default_settings as unknown as Record<string, unknown>;
-        for (const [key, value] of Object.entries(overrides)) {
-          settings[key] = value;
-        }
-        fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
-      }
-    }
-
-    try {
-      const result = await alphaBatchSubmit({ expressions, concurrency });
-      const text = formatResults(result.results);
-      return { content: [{ type: "text" as const, text }] };
-    } finally {
-      // Restore original config
-      if (configBackup !== null) {
-        fs.writeFileSync(CONFIG_PATH, configBackup);
-      }
-    }
+    const result = await alphaBatchSubmit({
+      expressions,
+      concurrency,
+      settingsOverrides: Object.keys(settingsOverrides).length > 0 ? settingsOverrides : undefined
+    });
+    const text = formatResults(result.results);
+    return { content: [{ type: "text" as const, text }] };
   },
 };
 
@@ -223,6 +294,7 @@ const searchFieldsTool: AnyAgentTool = {
   description:
     "搜索WorldQuant BRAIN平台的数据字段。支持按关键词搜索和按数据集筛选。" +
     "返回字段ID、名称和描述。用于发现可用的数据字段来构建Alpha表达式。" +
+    "搜索结果会缓存到本地数据库，下次搜索时优先查询本地缓存。" +
     "认证由工具内部自动处理（Cookie认证，缓存4小时），无需手动干预。",
   parameters: SearchFieldsSchema,
   execute: async (_toolCallId: string, rawParams: Record<string, unknown>) => {
@@ -230,10 +302,59 @@ const searchFieldsTool: AnyAgentTool = {
     const dataset = rawParams.dataset as string | undefined;
     const limit = rawParams.limit as number | undefined;
 
+    // 先查本地缓存
+    try {
+      const db = await getDatabase();
+      const cachedFields = await db.getDataFields(dataset);
+      if (cachedFields.length > 0) {
+        // 按关键词过滤缓存
+        const keyword = query.toLowerCase();
+        const filtered = cachedFields.filter(f =>
+          f.field_id.toLowerCase().includes(keyword) ||
+          f.name.toLowerCase().includes(keyword) ||
+          (f.description && f.description.toLowerCase().includes(keyword))
+        );
+        if (filtered.length > 0) {
+          const text = formatSearchResults({
+            fields: filtered.map(f => ({
+              id: f.field_id,
+              name: f.name,
+              description: f.description || '',
+              type: f.data_type || '',
+              datasetId: f.dataset_id || ''
+            })),
+            totalCount: filtered.length,
+            searchKeyword: query,
+            datasetId: dataset
+          });
+          return { content: [{ type: "text" as const, text }] };
+        }
+      }
+    } catch (e) {
+      // 缓存查询失败，继续走API
+    }
+
     const result = await searchFields(query, {
       datasetId: dataset,
       limit,
     });
+
+    // 搜索完成后缓存结果到数据库
+    try {
+      const db = await getDatabase();
+      const fieldsToCache = result.fields.map(f => ({
+        field_id: f.id,
+        name: f.name || '',
+        description: f.description || '',
+        dataset_id: f.datasetId || '',
+        data_type: f.type || '',
+        region: 'USA',
+        fetched_at: new Date().toISOString()
+      }));
+      await db.saveDataFields(fieldsToCache);
+    } catch (e) {
+      // 缓存失败不影响返回
+    }
 
     const text = formatSearchResults(result);
     return { content: [{ type: "text" as const, text }] };
@@ -338,6 +459,104 @@ const updateCorrelationTool: AnyAgentTool = {
   },
 };
 
+// ── 新增5个工具 ──────────────────────────────────────────────
+
+const checkSubmissionTool: AnyAgentTool = {
+  name: "checkSubmission",
+  label: "提交前检查",
+  description:
+    "检查Alpha的IS Checks是否全部通过，判断是否可以提交。" +
+    "返回每项检查的PASS/FAIL状态，以及SELF_CORRELATION的具体值。" +
+    "综合判断：全部PASS则可提交，有FAIL项则不可提交。",
+  parameters: CheckSubmissionSchema,
+  execute: async (_toolCallId: string, rawParams: Record<string, unknown>) => {
+    const alphaId = rawParams.alphaId as string;
+
+    const { session, cookie } = await getAuthSession();
+    const result = await checkSubmission(alphaId, session, cookie);
+    const text = formatCheckResult(result);
+    return { content: [{ type: "text" as const, text }] };
+  },
+};
+
+const submitAlphaTool: AnyAgentTool = {
+  name: "submitAlpha",
+  label: "正式提交Alpha",
+  description:
+    "将Alpha正式提交到BRAIN平台。必须用户确认后才能执行（confirmed参数必须为true）。" +
+    "提交后会自动轮询等待结果，成功后更新数据库提交状态。" +
+    "⚠️ 提交是不可逆操作，请确保用户已充分了解并确认。",
+  parameters: SubmitAlphaSchema,
+  execute: async (_toolCallId: string, rawParams: Record<string, unknown>) => {
+    const alphaId = rawParams.alphaId as string;
+    const confirmed = rawParams.confirmed as boolean;
+
+    if (!confirmed) {
+      const text = "❌ 必须用户确认后才能提交。请将confirmed参数设为true。";
+      return { content: [{ type: "text" as const, text }] };
+    }
+
+    const { session, cookie } = await getAuthSession();
+    const db = await getDatabase();
+    const result = await submitAlpha(alphaId, confirmed, session, cookie, db);
+    const text = formatSubmitResult(result);
+    return { content: [{ type: "text" as const, text }] };
+  },
+};
+
+const getAlphaCorrelationsTool: AnyAgentTool = {
+  name: "getAlphaCorrelations",
+  label: "查询Alpha相关性",
+  description:
+    "查询Alpha的Self Correlation数据（Maximum和Minimum相关性）。" +
+    "查询结果会自动更新到本地数据库。" +
+    "用于评估Alpha与已有Alpha的相关性，判断是否值得提交。",
+  parameters: GetAlphaCorrelationsSchema,
+  execute: async (_toolCallId: string, rawParams: Record<string, unknown>) => {
+    const alphaId = rawParams.alphaId as string;
+
+    const { session, cookie } = await getAuthSession();
+    const db = await getDatabase();
+    const result = await getAlphaCorrelations(alphaId, session, cookie, db);
+    const text = formatCorrelationResult(result);
+    return { content: [{ type: "text" as const, text }] };
+  },
+};
+
+const listAlphasTool: AnyAgentTool = {
+  name: "listAlphas",
+  label: "Alpha列表",
+  description:
+    "获取当前用户在BRAIN平台的Alpha列表。支持按状态筛选和分页。" +
+    "返回Alpha的ID、表达式、状态、Sharpe等关键指标，格式化为表格输出。",
+  parameters: ListAlphasSchema,
+  execute: async (_toolCallId: string, rawParams: Record<string, unknown>) => {
+    const status = rawParams.status as string | undefined;
+    const limit = rawParams.limit as number | undefined;
+    const offset = rawParams.offset as number | undefined;
+
+    const { session, cookie } = await getAuthSession();
+    const result = await listAlphas({ status, limit, offset }, session, cookie);
+    const text = formatAlphaList(result);
+    return { content: [{ type: "text" as const, text }] };
+  },
+};
+
+const getUserInfoTool: AnyAgentTool = {
+  name: "getUserInfo",
+  label: "获取用户信息",
+  description:
+    "获取当前登录用户的BRAIN平台信息，包括用户名、ID、邮箱等。" +
+    "用于确认当前登录身份和账号状态。",
+  parameters: GetUserInfoSchema,
+  execute: async (_toolCallId: string, _rawParams: Record<string, unknown>) => {
+    const { session, cookie } = await getAuthSession();
+    const result = await getUserInfo(session, cookie);
+    const text = formatUserInfo(result);
+    return { content: [{ type: "text" as const, text }] };
+  },
+};
+
 // ── Plugin Entry ──────────────────────────────────────────────
 
 export default definePluginEntry({
@@ -352,5 +571,10 @@ export default definePluginEntry({
     api.registerTool(alphaStatsTool as AnyAgentTool);
     api.registerTool(updateSubmitStatusTool as AnyAgentTool);
     api.registerTool(updateCorrelationTool as AnyAgentTool);
+    api.registerTool(checkSubmissionTool as AnyAgentTool);
+    api.registerTool(submitAlphaTool as AnyAgentTool);
+    api.registerTool(getAlphaCorrelationsTool as AnyAgentTool);
+    api.registerTool(listAlphasTool as AnyAgentTool);
+    api.registerTool(getUserInfoTool as AnyAgentTool);
   },
 });

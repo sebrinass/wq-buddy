@@ -9,7 +9,7 @@ metadata:
       config:
         - path: "~/.wq-buddy/config.json"
           access: "read-write"
-          purpose: "读取BRAIN账号配置（含明文凭证）；回测时临时写入参数覆盖后恢复"
+          purpose: "读取BRAIN账号配置和默认回测参数；参数覆盖通过内存方式实现，不修改配置文件"
         - path: "~/.openclaw/openclaw.json"
           access: "read-write"
           purpose: "添加插件路径并重启Gateway"
@@ -131,7 +131,21 @@ wq analyze fnd2_ebitdm
 │  └─ updateSubmitStatus({id, status, reason?})
 │
 ├─ 更新相关性
-│  └─ updateCorrelation({id, correlationMax?, correlationMin?})
+│  ├─ 自动获取 → 回测可提交时自动查询（无需手动）
+│  ├─ 手动查询单个 → getAlphaCorrelations({alphaId})
+│  └─ 手动补充 → updateCorrelation({id, correlationMax?, correlationMin?})
+│
+├─ 提交前检查
+│  └─ checkSubmission({alphaId}) → 查看所有检查项确定值（含SELF_CORRELATION）
+│
+├─ 提交Alpha
+│  └─ submitAlpha({alphaId, confirmed}) → 确认后提交（单条，需confirmed=true）
+│
+├─ 查看已有Alpha
+│  └─ listAlphas({status?, limit?, offset?}) → 查询平台Alpha列表
+│
+├─ 查看用户信息
+│  └─ getUserInfo() → 显示当前登录账号信息
 │
 └─ 导出/文档
    ├─ wq export [alpha|field] [路径]
@@ -235,7 +249,7 @@ wq analyze fnd2_ebitdm
 
 ---
 
-### updateCorrelation — 更新相关性
+### updateCorrelation — 手动更新相关性
 
 **注册工具**: `updateCorrelation({id, correlationMax?, correlationMin?})`
 
@@ -249,6 +263,74 @@ wq analyze fnd2_ebitdm
 
 ---
 
+### checkSubmission — 提交前检查
+
+**注册工具**: `checkSubmission({alphaId})`
+
+| 参数 | 必填 | 说明 |
+|------|------|------|
+| alphaId | 是 | BRAIN平台的Alpha ID |
+
+返回所有检查项的确定值（PASS/FAIL），包含SELF_CORRELATION等IS阶段为PENDING的项
+
+**与回测IS checks的关系**：回测返回的IS checks中SELF_CORRELATION通常为PENDING，checkSubmission返回确定值，两者互补
+
+---
+
+### submitAlpha — 正式提交Alpha
+
+**注册工具**: `submitAlpha({alphaId, confirmed})`
+
+| 参数 | 必填 | 说明 |
+|------|------|------|
+| alphaId | 是 | BRAIN平台的Alpha ID |
+| confirmed | 是 | 必须为true才执行提交 |
+
+**⚠️ 安全规则（硬规则）**：
+- 提交前必须向用户展示确认单（Alpha ID、表达式、指标、检查结果）
+- 用户确认后才调用（confirmed=true）
+- **单条提交，不做批量**
+- 提交低质量Alpha会影响评分，需谨慎
+- 建议先调用checkSubmission确认所有检查项PASS后再提交
+
+---
+
+### getAlphaCorrelations — 获取生产相关性
+
+**注册工具**: `getAlphaCorrelations({alphaId})`
+
+| 参数 | 必填 | 说明 |
+|------|------|------|
+| alphaId | 是 | BRAIN平台的Alpha ID |
+
+从API获取与平台已有Alpha的相关性数据，自动更新到本地数据库
+
+**自动化流程**：回测完成后如果IS检查全PASS（可提交），系统自动调用此工具获取相关性，无需手动操作
+
+---
+
+### listAlphas — Alpha列表管理
+
+**注册工具**: `listAlphas({status?, limit?, offset?})`
+
+| 参数 | 必填 | 默认 | 说明 |
+|------|------|------|------|
+| status | 否 | - | 按状态筛选 |
+| limit | 否 | 20 | 返回数量 |
+| offset | 否 | 0 | 分页偏移 |
+
+查询BRAIN平台上的Alpha列表，用于查看已提交/已模拟的Alpha
+
+---
+
+### getUserInfo — 获取用户信息
+
+**注册工具**: `getUserInfo()`
+
+无参数。返回当前登录账号的用户名、ID等信息
+
+---
+
 ## 禁止模式
 
 ```
@@ -259,6 +341,8 @@ wq analyze fnd2_ebitdm
 ❌ 禁止：使用Bearer Token认证（平台只支持Cookie）
 ❌ 禁止：自动将"可提交(待查)"改为"已通过"
 ❌ 禁止：猜测或编造correlation数值
+❌ 禁止：未经用户确认就调用submitAlpha（confirmed必须为true）
+❌ 禁止：批量提交Alpha（submitAlpha只支持单条）
 ❌ 禁止：在用户未确认前修改reject_reason
 ❌ 禁止：后台执行回测+反复poll轮询进度（浪费API额度）
 ❌ 禁止：遇429限速时手动sleep+重试（工具内部自动处理）
@@ -271,6 +355,7 @@ wq analyze fnd2_ebitdm
 ✅ 正确：等用户告知平台结果后再更新状态
 ✅ 正确：阻塞式等待回测完成，一次性获取全部结果
 ✅ 正确：大批量回测用sessions_spawn开子代理，避免卡主会话
+✅ 正确：提交前用checkSubmission确认，用户确认后才submitAlpha
 ```
 
 ---
@@ -292,18 +377,33 @@ wq analyze fnd2_ebitdm
 
 ## 提交状态工作流
 
+**⚠️ IS结果判断标准（核心）**：
+- `IS结果：✅ 可提交` = checks数组中没有任何FAIL项（PENDING忽略，SELF_CORRELATION在提交前检查）
+- `IS结果：❌ 不可提交` = checks数组中有任何FAIL项
+- 提交前必须确认IS结果为"可提交"，否则平台会拒绝
+
+**🔄 自动化流程**：
+- 回测完成后，如果IS检查全PASS（可提交），系统自动查询生产相关性
+- 相关性数据自动录入数据库，用户无需手动查询
+- 手动查询仍可通过getAlphaCorrelations工具
+
 ```
-未提交 → 可提交(待查) → 已通过 / 提交失败
-                          ↑
-                    失败原因记录在reject_reason
+未提交 → 可提交(待查) → 提交前检查 → 已提交 → 已通过 / 提交失败
+              │              │                        ↑
+         自动查相关性    checkSubmission        失败原因记录在reject_reason
+         自动录入DB     确认所有项PASS
+                            │
+                     用户确认后submitAlpha
 ```
 
 | 状态 | 触发条件 | 谁操作 | Agent做什么 |
 |------|----------|--------|-------------|
 | 未提交 | 回测失败 / IS有FAIL | 自动 | 显示结果，不提醒 |
-| 可提交(待查) | IS全PASS | 自动判断 | 强制提醒用户查平台 |
-| 已通过 | 用户确认OK | 手动 | updateSubmitStatus(id, "已通过") |
-| 提交失败 | 用户告知失败+原因 | 手动 | updateSubmitStatus(id, "提交失败", reason) |
+| 可提交(待查) | IS全PASS | 自动判断 | 自动查相关性；提醒用户查平台 |
+| 提交前检查 | 用户准备提交 | 用户触发 | checkSubmission确认所有项PASS |
+| 已提交 | 用户确认后提交 | 用户确认 | submitAlpha(alphaId, confirmed=true) |
+| 已通过 | 平台验证通过 | 自动/手动 | 更新submit_status |
+| 提交失败 | 平台验证失败 | 自动/手动 | updateSubmitStatus(id, "提交失败", reason) |
 
 详见 [submission-workflow.md](../references/submission-workflow.md)
 

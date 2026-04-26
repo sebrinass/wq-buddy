@@ -1,6 +1,6 @@
 {
   "name": "wq-buddy",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "WQBuddy - WorldQuant BRAIN Alpha挖掘AI协作工具",
   "type": "module",
   "main": "dist/tools.js",

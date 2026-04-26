@@ -43,3 +43,8 @@ node_modules/
 # IDE配置
 .vscode/
 .idea/
+
+# 项目文档（不同步）
+CHANGELOG.md
+improvement-plan.md
+comparison-report.md
