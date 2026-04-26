@@ -3,7 +3,7 @@
   "name": "WQBuddy",
   "description": "WorldQuant BRAIN Alpha挖掘协作工具 - 字段勘探、表达式构建、回测分析、优化迭代和提交管理",
   "kind": "extension",
-  "version": "1.0.3",
+  "version": "1.0.6",
   "contracts": {
     "tools": [
       "alphaBatchSubmit",

@@ -1,6 +1,6 @@
 {
   "name": "wq-buddy",
-  "version": "1.0.4",
+  "version": "1.0.6",
   "description": "WQBuddy - WorldQuant BRAIN Alpha挖掘AI协作工具",
   "type": "module",
   "main": "dist/tools.js",
@@ -34,7 +34,6 @@
   ],
   "files": [
     "dist/",
-    "references/",
     "skill/",
     "config.example.json",
     "openclaw.plugin.json",
