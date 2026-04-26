@@ -9,35 +9,57 @@ metadata:
       config:
         - path: "~/.wq-buddy/config.json"
           access: "read-write"
-          purpose: "读取BRAIN账号配置和默认回测参数；参数覆盖通过内存方式实现，不修改配置文件"
+          purpose: "存储BRAIN平台登录凭据和默认回测参数。平台仅支持Cookie会话认证，不支持OAuth/API Key，因此需要存储用户名密码。Token缓存机制减少重复登录。"
         - path: "~/.openclaw/openclaw.json"
           access: "read-write"
           purpose: "添加插件路径并重启Gateway"
-    filesystem:
-      - path: "~/.wq-buddy/alpha_workbench.db"
-        access: "read-write"
-        purpose: "存储Alpha回测结果和字段分析数据"
-      - path: "~/.wq-buddy/references"
-        access: "read-write"
-        purpose: "读取和更新策略知识库文档"
-      - path: "~/.wq-buddy/.wq_token.json"
-        access: "read-write"
-        purpose: "缓存BRAIN平台登录会话Token"
-    install:
-      - id: npm
-        kind: node
-        package: "wq-buddy"
-        label: "Install via npm"
-      - id: clawhub
-        kind: clawhub
-    slug: wq-buddy
-    label: "Install via ClawHub"
+      filesystem:
+        - path: "~/.wq-buddy/alpha_workbench.db"
+          access: "read-write"
+          purpose: "存储Alpha回测结果和字段分析数据"
+        - path: "~/.wq-buddy/references"
+          access: "read-write"
+          purpose: "读取和更新策略知识库文档"
+        - path: "~/.wq-buddy/.wq_token.json"
+          access: "read-write"
+          purpose: "缓存BRAIN平台登录会话Token（有效期4小时），避免频繁重新登录。Token自动刷新，用户无需手动管理。"
+      credentials:
+        - name: "BRAIN账号"
+          type: "username_password"
+          storage: "file"
+          path: "~/.wq-buddy/config.json"
+          purpose: "WorldQuant BRAIN平台登录凭据"
+          note: "平台不支持OAuth/API Key，仅支持Cookie会话认证"
+      install:
+        - id: npm
+          kind: node
+          package: "wq-buddy"
+          label: "Install via npm"
+        - id: clawhub
+          kind: clawhub
+          slug: wq-buddy
+          label: "Install via ClawHub (OpenClaw官方插件市场)"
 ---
 
 # WQBuddy - WorldQuant BRAIN Alpha挖掘协作专家
 
 **项目仓库**: https://github.com/sebrinass/wq-buddy
 **npm包**: https://www.npmjs.com/package/wq-buddy
+
+## ⚠️ 安全说明
+
+本工具需要您的WorldQuant BRAIN平台凭据才能正常工作：
+
+- **凭据存储**：用户名和密码存储在 `~/.wq-buddy/config.json`，请确保该文件权限安全
+- **Token缓存**：登录后会话Token缓存4小时，减少重复登录
+- **平台限制**：BRAIN平台不支持OAuth或API Key认证，仅支持Cookie会话认证
+- **数据本地**：所有回测数据、Alpha记录均存储在本地SQLite数据库，不上传任何数据
+- **代码开源**：https://github.com/sebrinass/wq-buddy
+
+**建议**：
+- 使用专用的BRAIN测试账号
+- 定期更换密码
+- 不要在共享环境中使用
 
 ## 安装步骤
 
